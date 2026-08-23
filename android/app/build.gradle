@@ -7,7 +7,11 @@ android {
         applicationId "com.ondrejluka.skillshot"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // Play permanently reserves every version code it has already accepted, so a
+        // second upload reusing one is refused outright. CI passes github.run_number,
+        // which only ever climbs. A local build with nothing set falls back to 1.
+        def ciVersionCode = System.getenv("SKILLSHOT_VERSION_CODE")
+        versionCode(ciVersionCode ? ciVersionCode.toInteger() : 1)
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      # Read by android/app/build.gradle. Play refuses a version code it has seen
+      # before, so it tracks the run number rather than a hardcoded value.
+      SKILLSHOT_VERSION_CODE: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v6
 
@@ -52,6 +55,7 @@ jobs:
           else
             echo "No keystore secret set - building UNSIGNED. Play will not accept this."
           fi
+          echo "Version code: ${SKILLSHOT_VERSION_CODE:-1 (fallback - env var did not reach the build)}"
           ./gradlew bundleRelease --no-daemon
 
       - name: Build debug APK for sideloading

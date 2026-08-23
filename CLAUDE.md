@@ -61,6 +61,14 @@ No local Android SDK needed. GitHub Actions does it:
 actually present, so unsigned builds still succeed. Secrets: `KEYSTORE_BASE64`,
 `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`.
 
+**`versionCode` tracks `github.run_number`** via `SKILLSHOT_VERSION_CODE`, matching what
+`ios.yml` does with `CURRENT_PROJECT_VERSION`. Play permanently reserves every version code
+it has accepted and refuses a repeat, so a hardcoded number blocks the second upload. A
+local build with the variable unset falls back to 1. The one way this breaks is a fresh
+repo: `run_number` restarts at 1, and codes below what Play already holds are refused —
+add an offset to the workflow if that ever happens. Version code 1 was uploaded from the
+old repo on 23 Aug 2026.
+
 **The `chmod +x android/gradlew` step is load-bearing.** Ondrej is on Windows, which does
 not carry the executable bit; without it the Linux runner exits 126 with "Permission
 denied". Do not remove it.
