@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skillshot</title>
+<meta name="description" content="Skillshot — a mobile dodge game.">
+<meta name="theme-color" content="#07090F">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oxanium:wght@600;700;800&family=Barlow:wght@400;500&display=swap">
+<style>
+  :root{--void:#07090F;--mana:#37E1FF;--ink:#E8EEF6;--muted:#93A3B8;--line:#1E2C42}
+  *{box-sizing:border-box}
+  body{
+    margin:0;min-height:100vh;background:var(--void);color:var(--ink);
+    font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+    display:flex;align-items:center;justify-content:center;padding:2rem 1.25rem;
+  }
+  .card{max-width:32rem;text-align:center;display:flex;flex-direction:column;gap:1.1rem}
+  h1{
+    font-family:'Oxanium',system-ui,sans-serif;font-weight:800;
+    font-size:clamp(2.4rem,9vw,3.6rem);letter-spacing:.02em;margin:0;line-height:1
+  }
+  .tag{color:var(--muted);margin:0;font-size:1.05rem;line-height:1.6}
+  nav{display:flex;gap:1.5rem;justify-content:center;padding-top:.75rem;border-top:1px solid var(--line)}
+  a{color:var(--mana);text-decoration:underline;text-underline-offset:3px;font-weight:500}
+  a:focus-visible{outline:2px solid var(--mana);outline-offset:3px;border-radius:2px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>SKILLSHOT</h1>
+    <p class="tag">Skillshots, ground AoE, sidestep beams, homing orbs and laser boomerangs
+    fly in from every edge. Move one circle. Survive as long as you can.</p>
+    <nav><a href="privacy.html">Privacy Policy</a></nav>
+  </div>
+</body>
+</html>
