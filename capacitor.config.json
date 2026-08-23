@@ -1,5 +1,5 @@
 {
-  "appId": "com.ondrejluka.skillshot",
+  "appId": "skillshot.dodge.app",
   "appName": "Skillshot",
   "webDir": "www",
   "android": { "backgroundColor": "#07090F" },

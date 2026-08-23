@@ -1,10 +1,14 @@
 apply plugin: 'com.android.application'
 
 android {
+    // namespace is the Java package for generated code (R, BuildConfig) and matches the
+    // MainActivity source folder. applicationId is the identity Play checks, and Play fixes
+    // it permanently when the listing is created — theirs was registered as skillshot.dodge.app.
+    // The two are allowed to differ, so the Java sources stay where they are.
     namespace = "com.ondrejluka.skillshot"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.ondrejluka.skillshot"
+        applicationId "skillshot.dodge.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Play permanently reserves every version code it has already accepted, so a

@@ -20,7 +20,7 @@ assembled and tested against.
 
 | | |
 |---|---|
-| Capacitor 8.5.0 project | `appId` `com.ondrejluka.skillshot`, `appName` Skillshot |
+| Capacitor 8.5.0 project | `appId` `skillshot.dodge.app`, `appName` Skillshot |
 | Android + iOS platforms | scaffolded and synced |
 | Plugins installed and registered | `@capacitor-community/admob` 8.1.0, `@capacitor/preferences`, `@capacitor/splash-screen` |
 | `targetSdkVersion` | **36** — meets the 31 Aug 2026 Play deadline (Capacitor 8 defaults to it) |
@@ -68,8 +68,10 @@ all seven font faces load from the bundle.
 Never click your own live ads, not even once to check they work. That is the fastest
 route to a permanent AdMob ban — the test IDs exist for exactly this.
 
-**3 — Bundle ID** in `capacitor.config.json` if `com.ondrejluka.skillshot` is not what
-you want. It is permanent on both stores after the first release, so decide now.
+**3 — Bundle ID.** Settled: `skillshot.dodge.app`, in `capacitor.config.json`, the Android
+`applicationId` and the iOS `PRODUCT_BUNDLE_IDENTIFIER`. Play fixed it when the listing was
+created and it can never be changed. The Gradle `namespace` stays `com.ondrejluka.skillshot`
+on purpose — see CLAUDE.md.
 
 **4 — iOS `SKAdNetworkItems`.** Google publishes a list of network IDs to paste into
 `Info.plist` for iOS ad attribution. It changes, so pull the current list from Google's

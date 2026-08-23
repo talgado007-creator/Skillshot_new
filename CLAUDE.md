@@ -66,8 +66,18 @@ actually present, so unsigned builds still succeed. Secrets: `KEYSTORE_BASE64`,
 it has accepted and refuses a repeat, so a hardcoded number blocks the second upload. A
 local build with the variable unset falls back to 1. The one way this breaks is a fresh
 repo: `run_number` restarts at 1, and codes below what Play already holds are refused —
-add an offset to the workflow if that ever happens. Version code 1 was uploaded from the
-old repo on 23 Aug 2026.
+add an offset to the workflow if that ever happens. As of 23 Aug 2026 Play has accepted no
+build at all, so no version code is spoken for yet.
+
+**The Play package name is `skillshot.dodge.app`, and it is permanent.** The listing was
+created with that name before the first upload was attempted, and Play fixes the package
+name at creation — it cannot be renamed, and the bundle is rejected if it does not match.
+`applicationId` in `android/app/build.gradle` and `appId` in `capacitor.config.json` were
+changed to suit; the iOS `PRODUCT_BUNDLE_IDENTIFIER` was aligned too, since nothing is
+registered with App Store Connect yet. The Gradle `namespace` and the `MainActivity` source
+folder deliberately stay `com.ondrejluka.skillshot`: namespace only governs generated code
+(`R`, `BuildConfig`), Android allows the two to differ, and leaving it alone avoided moving
+Java sources for no benefit. Do not "tidy" them into agreement.
 
 **The `chmod +x android/gradlew` step is load-bearing.** Ondrej is on Windows, which does
 not carry the executable bit; without it the Linux runner exits 126 with "Permission
