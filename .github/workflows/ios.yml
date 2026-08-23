@@ -1,0 +1,161 @@
+# Builds the iOS app on GitHub's macOS runners — this is how you ship to the
+# App Store without owning a Mac.
+#
+# macos-26 ships Xcode 26.4.1 by default, which satisfies Apple's requirement that
+# App Store uploads be built with Xcode 26+ against the iOS 26 SDK.
+#
+# COST NOTE: macOS runner minutes bill at 10x the Linux rate on private repos.
+# A build here is a few minutes, so it is cheap, but it is not free like Android.
+#
+# ── SIGNING ────────────────────────────────────────────────────────────────────
+# With no secrets set this builds UNSIGNED, which only proves the project compiles.
+# Add these four repository secrets and it produces a signed .ipa instead:
+#
+#   ASC_KEY_ID       App Store Connect > Users and Access > Integrations > App Store
+#                    Connect API. Create a key with the "App Manager" role. This is
+#                    the 10-character Key ID.
+#   ASC_ISSUER_ID    The Issuer ID shown at the top of that same page (a UUID).
+#   ASC_PRIVATE_KEY  The whole contents of the AuthKey_XXXXXXXXXX.p8 file you
+#                    download when the key is created, BEGIN/END lines included.
+#                    Apple lets you download it exactly once.
+#   IOS_TEAM_ID      Developer account > Membership > Team ID (10 characters).
+#
+# There is deliberately no certificate or provisioning profile to manage. Passing
+# -allowProvisioningUpdates with the API key lets Xcode create and fetch both on
+# the runner, which is the only sane route when you have no Mac to run Keychain
+# Access on.
+#
+# Set the "upload" input to true to send the build to TestFlight as well.
+name: iOS
+
+on:
+  workflow_dispatch:        # on demand only, so you don't burn macOS minutes on every push
+    inputs:
+      upload:
+        description: 'Also upload to TestFlight (needs the signing secrets)'
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: macos-26
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and sync
+        run: |
+          npm ci
+          npx cap sync ios
+
+      # No CocoaPods here. Capacitor 8 wires its plugins through Swift Package
+      # Manager (ios/App/CapApp-SPM), so there is no Podfile and no .xcworkspace —
+      # every xcodebuild call below uses -project App.xcodeproj on purpose.
+      - name: Show what Xcode sees
+        working-directory: ios/App
+        run: xcodebuild -project App.xcodeproj -list
+
+      # ── unsigned path: no secrets set ───────────────────────────────────────
+      - name: Build (unsigned)
+        if: env.ASC_KEY_ID == ''
+        working-directory: ios/App
+        run: |
+          echo "No ASC_KEY_ID secret — building UNSIGNED. This cannot be uploaded."
+          xcodebuild -project App.xcodeproj \
+                     -scheme App \
+                     -configuration Release \
+                     -destination 'generic/platform=iOS' \
+                     CODE_SIGNING_ALLOWED=NO \
+                     clean build
+
+      # ── signed path ─────────────────────────────────────────────────────────
+      - name: Write the App Store Connect API key
+        if: env.ASC_KEY_ID != ''
+        run: |
+          # altool looks for AuthKey_<id>.p8 in ~/.appstoreconnect/private_keys
+          # and ~/private_keys. xcodebuild wants an explicit path. Put it in both.
+          mkdir -p ~/.appstoreconnect/private_keys ~/private_keys
+          printf '%s\n' "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          cp ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 ~/private_keys/
+          chmod 600 ~/.appstoreconnect/private_keys/*.p8 ~/private_keys/*.p8
+
+      - name: Archive (signed)
+        if: env.ASC_KEY_ID != ''
+        working-directory: ios/App
+        run: |
+          # CURRENT_PROJECT_VERSION is the build number. App Store Connect refuses a
+          # second upload with a build number it has already seen, so tie it to the
+          # run number — it never repeats and always climbs.
+          xcodebuild -project App.xcodeproj \
+                     -scheme App \
+                     -configuration Release \
+                     -destination 'generic/platform=iOS' \
+                     -archivePath "$RUNNER_TEMP/App.xcarchive" \
+                     -allowProvisioningUpdates \
+                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+                     -authenticationKeyID "$ASC_KEY_ID" \
+                     -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+                     DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
+                     CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+                     clean archive
+
+      - name: Export .ipa
+        if: env.ASC_KEY_ID != ''
+        working-directory: ios/App
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${IOS_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>destination</key><string>export</string>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+                     -archivePath "$RUNNER_TEMP/App.xcarchive" \
+                     -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+                     -exportPath "$RUNNER_TEMP/export" \
+                     -allowProvisioningUpdates \
+                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
+                     -authenticationKeyID "$ASC_KEY_ID" \
+                     -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+      - name: Upload build artifact
+        if: env.ASC_KEY_ID != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: skillshot-ios
+          path: ${{ runner.temp }}/export/*.ipa
+          if-no-files-found: error
+
+      - name: Upload to TestFlight
+        if: env.ASC_KEY_ID != '' && inputs.upload
+        run: |
+          IPA=$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)
+          echo "Uploading $IPA"
+          # Older Xcode spelled these --apiKey / --apiIssuer. Xcode 26's altool
+          # uses the hyphenated form; if it ever errors on an unknown option,
+          # that is the flag to flip.
+          xcrun altool --upload-app \
+                       --type ios \
+                       --file "$IPA" \
+                       --api-key "$ASC_KEY_ID" \
+                       --api-issuer "$ASC_ISSUER_ID"
+
+      - name: Clean up the key
+        if: always()
+        run: rm -rf ~/.appstoreconnect/private_keys ~/private_keys

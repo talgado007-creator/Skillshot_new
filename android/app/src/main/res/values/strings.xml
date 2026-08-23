@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Skillshot</string>
+    <string name="title_activity_main">Skillshot</string>
+    <string name="package_name">com.ondrejluka.skillshot</string>
+    <string name="custom_url_scheme">com.ondrejluka.skillshot</string>
+    <!-- AdMob App ID (not an ad unit ID). From AdMob > Apps > Skillshot (Android). -->
+    <string name="admob_app_id">ca-app-pub-4625958262504617~1006142631</string>
+</resources>

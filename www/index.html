@@ -1,0 +1,1591 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- viewport-fit=cover is what makes the game's env(safe-area-inset-*) padding work
+     on notched phones; without it the WebView also lays out at desktop width -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#07090F">
+<title>Skillshot</title>
+<style>
+@font-face{font-family:'Oxanium';font-style:normal;font-weight:600;font-display:block;src:url('fonts/oxanium-latin-600-normal.woff2') format('woff2')}
+@font-face{font-family:'Oxanium';font-style:normal;font-weight:700;font-display:block;src:url('fonts/oxanium-latin-700-normal.woff2') format('woff2')}
+@font-face{font-family:'Oxanium';font-style:normal;font-weight:800;font-display:block;src:url('fonts/oxanium-latin-800-normal.woff2') format('woff2')}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:400;font-display:block;src:url('fonts/barlow-latin-400-normal.woff2') format('woff2')}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:500;font-display:block;src:url('fonts/barlow-latin-500-normal.woff2') format('woff2')}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:600;font-display:block;src:url('fonts/barlow-latin-600-normal.woff2') format('woff2')}
+@font-face{font-family:'Barlow';font-style:normal;font-weight:700;font-display:block;src:url('fonts/barlow-latin-700-normal.woff2') format('woff2')}
+</style>
+
+<style>
+/* ── Skillshot ────────────────────────────────────────────────────────
+   Single visual world: a rift arena screen. Deliberately dark-only —
+   every colour is painted explicitly so the page holds on any host ground.
+   ------------------------------------------------------------------- */
+:root{
+  --void:#07090F;      /* arena ground, near-black w/ blue bias */
+  --rift:#0F1828;      /* panel surface */
+  --rift-2:#16223a;    /* raised surface */
+  --line:#22314e;      /* hairlines */
+  --mist:#8092b0;      /* muted slate text */
+  --bone:#E9EFF8;      /* primary text */
+  --mana:#37E1FF;      /* the player. the "you" colour */
+  --ember:#FF3B5C;     /* linear skillshots / danger */
+  --flare:#FFA02E;     /* ground AoE */
+  --hex:#B45CFF;       /* homing */
+  --acid:#C8FF3D;      /* crescent walls */
+  --beam:#F0DDFF;      /* sidestep beams */
+  --gold:#FFD166;      /* records */
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  background:var(--void);
+  color:var(--bone);
+  font-family:'Barlow',system-ui,-apple-system,'Segoe UI',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  user-select:none;-webkit-user-select:none;
+  touch-action:none;overscroll-behavior:none;
+  -webkit-tap-highlight-color:transparent;
+}
+#stage{position:fixed;inset:0;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* ── Type ── */
+.disp{font-family:'Oxanium','Barlow',sans-serif;font-weight:800;letter-spacing:.06em}
+.lab{font-family:'Oxanium',sans-serif;font-weight:600;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--mist)}
+.num{font-variant-numeric:tabular-nums;font-family:'Oxanium',sans-serif}
+
+/* ── In-run HUD ── */
+#hud{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s}
+#hud.on{opacity:1}
+#clock{
+  position:absolute;top:max(18px,env(safe-area-inset-top));left:0;right:0;
+  text-align:center;
+}
+#clock .t{font-family:'Oxanium',sans-serif;font-weight:800;font-size:clamp(38px,11vw,60px);
+  line-height:1;letter-spacing:.02em;font-variant-numeric:tabular-nums;
+  color:var(--bone);text-shadow:0 0 26px rgba(55,225,255,.35)}
+#clock .g{margin-top:5px;font-family:'Oxanium',sans-serif;font-weight:600;font-size:11px;
+  letter-spacing:.2em;color:var(--mist)}
+#clock .g b{color:var(--mana);font-weight:600}
+
+#pausebtn{
+  position:absolute;top:max(16px,env(safe-area-inset-top));
+  right:max(14px,env(safe-area-inset-right));
+  width:40px;height:40px;border-radius:10px;pointer-events:auto;cursor:pointer;
+  border:1px solid var(--line);background:rgba(15,24,40,.7);
+  color:var(--mist);font-size:11px;letter-spacing:.06em;
+}
+#pausebtn:active{transform:scale(.94)}
+
+/* ── Ability buttons ── */
+#abils{
+  position:absolute;right:max(16px,env(safe-area-inset-right));
+  bottom:max(26px,calc(env(safe-area-inset-bottom) + 18px));
+  display:flex;gap:10px;pointer-events:auto;
+}
+.ab{
+  position:relative;width:64px;height:64px;border-radius:50%;
+  border:1.5px solid var(--line);background:rgba(15,24,40,.82);
+  display:grid;place-items:center;isolation:isolate;
+  transition:transform .08s,border-color .15s;
+}
+.ab:active{transform:scale(.93)}
+.ab .k{font-family:'Oxanium',sans-serif;font-weight:800;font-size:19px;letter-spacing:.02em;color:var(--bone)}
+.ab .n{position:absolute;bottom:-15px;left:0;right:0;text-align:center;
+  font-family:'Oxanium',sans-serif;font-weight:600;font-size:9px;letter-spacing:.14em;color:var(--mist)}
+.ab .sweep{position:absolute;inset:-1.5px;border-radius:50%;overflow:hidden;pointer-events:none}
+.ab .cdnum{position:absolute;inset:0;display:grid;place-items:center;
+  font-family:'Oxanium',sans-serif;font-weight:800;font-size:17px;color:var(--mist);
+  font-variant-numeric:tabular-nums}
+.ab.cooling .k{opacity:0}
+.ab.ready{border-color:currentColor;box-shadow:0 0 18px -4px currentColor,inset 0 0 14px -8px currentColor}
+.ab.ready .k{color:currentColor}
+.ab[data-a="flash"]{color:var(--mana)}
+.ab[data-a="dash"]{color:var(--acid)}
+.ab[data-a="ghost"]{color:var(--hex)}
+.ab.hide{display:none}
+
+/* ── Overlays ── */
+.screen{
+  position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:flex-start;
+  padding:calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 20px);
+  background:radial-gradient(120% 80% at 50% 40%,rgba(7,9,15,.42),rgba(7,9,15,.86));
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
+  overflow-y:auto;
+}
+.screen.on{display:flex}
+.wrap{width:100%;max-width:390px;margin:auto 0;display:flex;flex-direction:column;gap:18px}
+/* without this, tall content makes flex children shrink below their contents and
+   overlap the buttons below them — panels end up covering RETRY */
+.wrap>*{flex-shrink:0}
+
+.brand{text-align:center}
+.brand h1{
+  font-family:'Oxanium',sans-serif;font-weight:800;
+  font-size:clamp(40px,13vw,60px);line-height:.92;letter-spacing:.16em;
+  color:var(--bone);text-shadow:0 0 40px rgba(55,225,255,.28);
+}
+.brand h1 span{color:var(--mana)}
+.brand p{margin-top:9px;font-size:13.5px;color:var(--mist);letter-spacing:.01em}
+
+.panel{background:rgba(15,24,40,.9);border:1px solid var(--line);border-radius:14px;padding:14px}
+.phead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:11px}
+
+/* loadout */
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.card{
+  border:1.5px solid var(--line);border-radius:11px;background:rgba(8,12,20,.6);
+  padding:11px 6px 9px;text-align:center;cursor:pointer;
+  transition:border-color .15s,background .15s,transform .08s;
+}
+.card:active{transform:scale(.97)}
+.card .ic{width:34px;height:34px;margin:0 auto 7px;border-radius:50%;
+  border:1.5px solid var(--line);display:grid;place-items:center;
+  font-family:'Oxanium',sans-serif;font-weight:800;font-size:14px;color:var(--mist)}
+.card .nm{font-family:'Oxanium',sans-serif;font-weight:700;font-size:11.5px;letter-spacing:.1em;color:var(--mist)}
+.card .cd{font-size:10px;color:#5c6b86;margin-top:2px;font-variant-numeric:tabular-nums}
+.card.on{background:rgba(8,12,20,.9)}
+.card.on .ic{border-color:currentColor;color:currentColor;box-shadow:0 0 16px -5px currentColor}
+.card.on .nm{color:var(--bone)}
+.card[data-a="flash"]{color:var(--mana)} .card[data-a="flash"].on{border-color:rgba(55,225,255,.55)}
+.card[data-a="dash"]{color:var(--acid)}  .card[data-a="dash"].on{border-color:rgba(200,255,61,.5)}
+.card[data-a="ghost"]{color:var(--hex)}  .card[data-a="ghost"].on{border-color:rgba(180,92,255,.55)}
+.hint{margin-top:10px;font-size:11.5px;line-height:1.45;color:#5c6b86}
+.privlink{margin-top:11px;background:none;border:none;padding:0;cursor:pointer;
+  font-family:'Barlow',sans-serif;font-size:11.5px;color:var(--mist);
+  text-decoration:underline;text-underline-offset:3px}
+.privlink[hidden]{display:none}
+.hint b{color:var(--gold);font-weight:600}
+
+/* buttons */
+.btn{
+  width:100%;padding:15px;border-radius:12px;border:none;cursor:pointer;
+  font-family:'Oxanium',sans-serif;font-weight:800;font-size:15px;letter-spacing:.16em;
+  transition:transform .08s,filter .15s;
+}
+.btn:active{transform:scale(.985)}
+.btn.pri{background:linear-gradient(180deg,#4be9ff,#17b9db);color:#04222b;
+  box-shadow:0 8px 26px -12px rgba(55,225,255,.9)}
+.btn.sec{background:rgba(22,34,58,.9);color:var(--bone);border:1px solid var(--line)}
+.btn.ad{background:rgba(22,34,58,.9);color:var(--gold);border:1px dashed rgba(255,209,102,.45)}
+.btn:disabled{opacity:.38;cursor:default}
+.row{display:flex;gap:8px}
+.row .btn{flex:1}
+
+/* leaderboard */
+.lb{display:flex;flex-direction:column;gap:1px}
+.lb .r{display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:9px;
+  padding:8px 2px;border-bottom:1px solid rgba(34,49,78,.5)}
+.lb .r:last-child{border-bottom:none}
+.lb .r .p{font-family:'Oxanium',sans-serif;font-weight:700;font-size:12px;color:#4d5b75;font-variant-numeric:tabular-nums}
+.lb .r:first-child .p{color:var(--gold)}
+.lb .r .tt{font-family:'Oxanium',sans-serif;font-weight:700;font-size:17px;font-variant-numeric:tabular-nums;color:var(--bone)}
+.lb .r:first-child .tt{color:var(--gold)}
+.lb .r .meta{display:flex;gap:4px;align-items:center;justify-content:flex-end}
+.badge{font-family:'Oxanium',sans-serif;font-weight:700;font-size:9px;letter-spacing:.06em;
+  padding:2px 5px;border-radius:4px;border:1px solid currentColor;opacity:.75}
+.badge.f{color:var(--mana)} .badge.d{color:var(--acid)} .badge.g{color:var(--hex)}
+.badge.pure{color:var(--gold);opacity:1}
+.badge.rev{color:var(--mist);border-style:dashed}
+.empty{font-size:12.5px;color:#4d5b75;text-align:center;padding:14px 0}
+
+/* game over */
+.result{text-align:center}
+.result .kill{font-family:'Oxanium',sans-serif;font-weight:800;font-size:12px;letter-spacing:.3em;color:var(--ember)}
+.result .big{font-family:'Oxanium',sans-serif;font-weight:800;font-size:clamp(52px,17vw,76px);
+  line-height:1;margin-top:6px;font-variant-numeric:tabular-nums;color:var(--bone)}
+.result .sub{margin-top:8px;font-size:12.5px;color:var(--mist);letter-spacing:.02em}
+.result .rec{margin-top:8px;display:inline-block;padding:4px 11px;border-radius:99px;
+  background:rgba(255,209,102,.13);border:1px solid rgba(255,209,102,.45);
+  font-family:'Oxanium',sans-serif;font-weight:700;font-size:10.5px;letter-spacing:.2em;color:var(--gold)}
+.adnote{font-size:10.5px;color:#4d5b75;text-align:center;letter-spacing:.04em}
+
+/* countdown */
+#countdown{position:absolute;inset:0;z-index:20;display:none;place-items:center;pointer-events:none;
+  background:radial-gradient(60% 40% at 50% 50%,rgba(7,9,15,.35),rgba(7,9,15,.7))}
+#countdown.on{display:grid}
+#cnum{font-family:'Oxanium',sans-serif;font-weight:800;
+  font-size:clamp(96px,27vw,164px);line-height:1;color:var(--mana);
+  text-shadow:0 0 70px rgba(55,225,255,.5);font-variant-numeric:tabular-nums}
+#cnum.pop{animation:pop .42s cubic-bezier(.2,.8,.3,1)}
+@keyframes pop{from{transform:scale(1.55);opacity:.1}to{transform:scale(1);opacity:1}}
+
+/* ad slot */
+#adslot{z-index:30}
+#adslot .wrap{max-width:320px;text-align:center;gap:14px}
+#adkind{font-family:'Oxanium',sans-serif;font-weight:800;font-size:24px;
+  letter-spacing:.12em;color:var(--gold)}
+#adbar{height:5px;border-radius:99px;background:rgba(34,49,78,.8);overflow:hidden}
+#adfill{height:100%;width:0;background:var(--gold);transition:width .06s linear}
+#adtime{font-family:'Oxanium',sans-serif;font-weight:800;font-size:34px;
+  color:var(--bone);font-variant-numeric:tabular-nums;min-height:38px}
+#adbox{border:1px dashed rgba(255,209,102,.4);border-radius:14px;padding:22px 16px;
+  background:rgba(15,24,40,.92);display:flex;flex-direction:column;gap:12px}
+
+/* rewarded-interstitial intro. Google requires reward messaging and a way out
+   BEFORE the ad starts, so this screen is a condition of running the format. */
+#adintro{z-index:32}
+#adintro .wrap{max-width:320px;text-align:center;gap:12px}
+#introbox{border:1px solid rgba(200,255,61,.42);border-radius:14px;padding:22px 16px;
+  background:rgba(15,24,40,.96);display:flex;flex-direction:column;gap:10px}
+#introbox .lab{color:var(--acid)}
+#introhead{font-family:'Oxanium',sans-serif;font-weight:800;font-size:23px;
+  letter-spacing:.08em;color:var(--acid)}
+#introsub{font-size:12.5px;color:var(--mist);line-height:1.55}
+#introsub b{color:var(--bone);font-weight:600}
+#introcount{font-family:'Oxanium',sans-serif;font-weight:700;font-size:11px;
+  letter-spacing:.16em;color:#4d5b75;min-height:14px}
+
+/* pause + toast */
+#pause .wrap{max-width:280px;text-align:center}
+#toast{position:absolute;z-index:40;left:0;right:0;top:38%;text-align:center;pointer-events:none;
+  opacity:0;transition:opacity .3s}
+#toast.on{opacity:1}
+#toast div{display:inline-block;padding:9px 18px;border-radius:10px;
+  background:rgba(15,24,40,.94);border:1px solid var(--line);
+  font-family:'Oxanium',sans-serif;font-weight:700;font-size:12px;letter-spacing:.16em;color:var(--gold)}
+
+:focus-visible{outline:2px solid var(--mana);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms !important}}
+</style>
+
+<div id="stage">
+  <canvas id="game"></canvas>
+
+  <!-- ── in-run HUD ── -->
+  <div id="hud">
+    <div id="clock"><div class="t num" id="ctime">0.00</div><div class="g">GRAZES <b id="cgraze">0</b></div></div>
+    <button id="pausebtn" aria-label="Pause">❚❚</button>
+    <div id="abils">
+      <button class="ab" data-a="flash" aria-label="Flash"><span class="k">F</span><span class="n">FLASH</span><span class="sweep"></span><span class="cdnum"></span></button>
+      <button class="ab" data-a="dash" aria-label="Dash"><span class="k">D</span><span class="n">DASH</span><span class="sweep"></span><span class="cdnum"></span></button>
+      <button class="ab" data-a="ghost" aria-label="Ghost"><span class="k">G</span><span class="n">GHOST</span><span class="sweep"></span><span class="cdnum"></span></button>
+    </div>
+  </div>
+
+  <div id="countdown"><span id="cnum"></span></div>
+
+  <!-- ── ad slot (web placeholder; on device AdMob draws over this) ── -->
+  <div class="screen" id="adslot">
+    <div class="wrap">
+      <div id="adbox">
+        <div class="lab">Advertisement</div>
+        <div id="adkind"></div>
+        <div id="adtime" class="num"></div>
+        <div id="adbar"><div id="adfill"></div></div>
+        <p class="adnote" style="margin:0">Placeholder. On device this slot plays a real AdMob ad.</p>
+      </div>
+      <button class="btn sec" id="adskip">CLOSE</button>
+    </div>
+  </div>
+
+  <!-- ── rewarded interstitial intro (shown only once an ad is loaded) ── -->
+  <div class="screen" id="adintro">
+    <div class="wrap">
+      <div id="introbox">
+        <div class="lab">Bonus offer</div>
+        <div id="introhead">SECOND REVIVE</div>
+        <div id="introsub">Watch a short ad and your next run gets <b>two revives</b> instead of one.</div>
+        <div id="introcount">AD STARTS IN 5</div>
+      </div>
+      <button class="btn pri" id="introwatch">WATCH AD</button>
+      <button class="btn sec" id="introskip">NO THANKS</button>
+    </div>
+  </div>
+
+  <div id="toast"><div id="toastmsg"></div></div>
+
+  <!-- ── menu ── -->
+  <div class="screen on" id="menu">
+    <div class="wrap">
+      <div class="brand">
+        <h1>SKILL<span>SHOT</span></h1>
+        <p>Everything on this screen wants to hit you. Don't be there.</p>
+      </div>
+
+      <div class="panel">
+        <div class="phead"><span class="lab">Loadout</span><span class="lab" id="loadstate">2 armed</span></div>
+        <div class="cards">
+          <div class="card on" data-a="flash"><div class="ic">F</div><div class="nm">FLASH</div><div class="cd">9s</div></div>
+          <div class="card on" data-a="dash"><div class="ic">D</div><div class="nm">DASH</div><div class="cd">5s</div></div>
+          <div class="card" data-a="ghost"><div class="ic">G</div><div class="nm">GHOST</div><div class="cd">11s</div></div>
+        </div>
+        <div class="hint">Flash blinks instantly. Dash propels you forward. Ghost makes you faster for 2.5s. Run with nothing armed and your time earns a <b>★ PURIST</b> mark.</div>
+        <button id="privacyopts" class="privlink" hidden>Privacy &amp; ad settings</button>
+      </div>
+
+      <button class="btn pri" id="play">PLAY</button>
+
+      <div class="panel">
+        <div class="phead"><span class="lab">Best times</span><span class="lab" id="runcount"></span></div>
+        <div class="lb" id="board"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── game over ── -->
+  <div class="screen" id="over">
+    <div class="wrap">
+      <div class="result">
+        <div class="kill">ELIMINATED</div>
+        <div class="big num" id="otime">0.00</div>
+        <div class="sub" id="osub"></div>
+        <div id="orec" style="display:none" class="rec">NEW BEST</div>
+      </div>
+      <button class="btn ad" id="revive">↻ REVIVE — WATCH AD</button>
+      <div class="adnote" id="adnote">One ad revive per run, plus any bonus revive you have banked · revived times are flagged</div>
+      <div class="row">
+        <button class="btn pri" id="again">RETRY</button>
+        <button class="btn sec" id="tomenu">MENU</button>
+      </div>
+      <div class="panel">
+        <div class="phead"><span class="lab">Best times</span></div>
+        <div class="lb" id="board2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── pause ── -->
+  <div class="screen" id="pause">
+    <div class="wrap">
+      <div class="brand"><h1 style="font-size:30px">PAUSED</h1></div>
+      <button class="btn pri" id="resume">RESUME</button>
+      <button class="btn sec" id="quit">END RUN</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ══ setup ══════════════════════════════════════════════════════════ */
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const C = {
+  void:'#07090F', grid:'#111c30',
+  mana:'#37E1FF', ember:'#FF3B5C', flare:'#FFA02E', hex:'#B45CFF', acid:'#C8FF3D',
+  beam:'#F0DDFF', bone:'#E9EFF8'
+};
+
+let W = 0, H = 0, U = 1, DIAG = 0;
+function resize(){
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = cv.clientWidth || window.innerWidth;
+  H = cv.clientHeight || window.innerHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  U = Math.min(W, H) / 420;
+  DIAG = Math.hypot(W, H);
+}
+addEventListener('resize', resize);
+
+/* ══ state ══════════════════════════════════════════════════════════ */
+const S = {
+  mode:'menu',        // menu | play | over | paused
+  t:0, haz:[], parts:[], trail:[],
+  spawnT:0, clutterT:0, shake:0, flash:0, count:0, busy:false, grace:0, rec:null, lastAdDeath:0,
+  grazes:0, revives:0, adRevive:true, bonus:0, deaths:0, best:0
+};
+const P = { x:0, y:0, vx:0, vy:0, r:9, fx:0, fy:-1, dashT:0, ghostT:0, inv:0 };
+const CDMAX = { flash:9, dash:5, ghost:11 };
+const CD = { flash:0, dash:0, ghost:0 };
+const LOAD = { flash:true, dash:true, ghost:false };
+
+const BASE_SPEED = 232;          // px/s at U=1
+const DASH_TIME = 0.16, DASH_MUL = 4.4;
+const GHOST_TIME = 2.5, GHOST_MUL = 1.62;
+const FLASH_DIST = 96;
+
+/* ══ input ══════════════════════════════════════════════════════════ */
+const stick = { on:false, id:null, ox:0, oy:0, cx:0, cy:0, dx:0, dy:0 };
+const keys = Object.create(null);
+const STICK_MAX = 58;
+
+cv.addEventListener('pointerdown', e => {
+  if (S.mode !== 'play') return;
+  if (inThumbZone(e.clientX, e.clientY)) return;   // don't grab the ability thumb
+  stick.on = true; stick.id = e.pointerId;
+  stick.ox = stick.cx = e.clientX; stick.oy = stick.cy = e.clientY;
+  stick.dx = stick.dy = 0;
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove', e => {
+  if (!stick.on || e.pointerId !== stick.id) return;
+  if (S.mode !== 'play') { resetStick(); return; }
+  const max = STICK_MAX * U;
+  let dx = e.clientX - stick.ox, dy = e.clientY - stick.oy;
+  const m = Math.hypot(dx, dy);
+  if (m > max) { const k = max / m; dx *= k; dy *= k; }
+  stick.cx = stick.ox + dx; stick.cy = stick.oy + dy;
+  stick.dx = dx / max; stick.dy = dy / max;
+});
+function release(e){ if (e.pointerId === stick.id) resetStick(); }
+// A finger still down when a run ends used to carry into the next run: the new
+// circle slid off spawn at full tilt with the ring drawn at a stale origin.
+function resetStick(){ stick.on = false; stick.id = null; stick.dx = stick.dy = 0; }
+cv.addEventListener('pointerup', release);
+cv.addEventListener('pointercancel', release);
+
+addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (e.key === ' ') e.preventDefault();
+  if (S.mode === 'play') {
+    if (e.key.toLowerCase() === 'f') cast('flash');
+    if (e.key === ' ') cast('dash');
+    if (e.key.toLowerCase() === 'g') cast('ghost');
+    if (e.key === 'Escape' || e.key.toLowerCase() === 'p') setPause(true);
+  } else if (e.key === 'Enter') {
+    if (S.mode === 'menu') startRun();
+    else if (S.mode === 'over') retry();
+  }
+});
+addEventListener('keyup', e => { keys[e.key.toLowerCase()] = false; });
+
+function keyVec(){
+  let x = 0, y = 0;
+  if (keys['a'] || keys['arrowleft']) x -= 1;
+  if (keys['d'] || keys['arrowright']) x += 1;
+  if (keys['w'] || keys['arrowup']) y -= 1;
+  if (keys['s'] || keys['arrowdown']) y += 1;
+  return [x, y];
+}
+
+/* ══ abilities ══════════════════════════════════════════════════════ */
+function cast(k){
+  if (!LOAD[k] || CD[k] > 0 || S.mode !== 'play' || S.count > 0) return;
+  if (k === 'flash') {
+    const pr = P.r * U;
+    P.x = clamp(P.x + P.fx * FLASH_DIST * U, pr, W - pr);
+    P.y = clamp(P.y + P.fy * FLASH_DIST * U, pr, H - pr);
+    burst(P.x, P.y, C.mana, 14, 150);
+    S.trail.length = 0;
+  } else if (k === 'dash') {
+    P.dashT = DASH_TIME; burst(P.x, P.y, C.acid, 9, 90);
+  } else if (k === 'ghost') {
+    P.ghostT = GHOST_TIME; burst(P.x, P.y, C.hex, 10, 70);
+  }
+  CD[k] = CDMAX[k];
+  buzz(12);
+}
+
+/* ══ helpers ════════════════════════════════════════════════════════ */
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+function buzz(ms){ try { navigator.vibrate && navigator.vibrate(ms); } catch(_){} }
+
+function edgePoint(pad){
+  const s = (Math.random() * 4) | 0;
+  if (s === 0) return { x: rnd(-pad, W + pad), y: -pad };
+  if (s === 1) return { x: W + pad, y: rnd(-pad, H + pad) };
+  if (s === 2) return { x: rnd(-pad, W + pad), y: H + pad };
+  return { x: -pad, y: rnd(-pad, H + pad) };
+}
+// Untelegraphed shots need runway: keep picking an edge until the projectile has far
+// enough to travel that the player can actually see it coming.
+function edgePointFar(pad, tx, ty, minDist){
+  let best = null, bestD = -1;
+  for (let i = 0; i < 6; i++) {
+    const p = edgePoint(pad);
+    const d = Math.hypot(p.x - tx, p.y - ty);
+    if (d > bestD) { bestD = d; best = p; }
+    if (d >= minDist) return p;
+  }
+  return best;
+}
+function segDist(px, py, ax, ay, bx, by){
+  const dx = bx - ax, dy = by - ay;
+  const L = dx * dx + dy * dy;
+  let t = L ? ((px - ax) * dx + (py - ay) * dy) / L : 0;
+  t = clamp(t, 0, 1);
+  return Math.hypot(px - (ax + dx * t), py - (ay + dy * t));
+}
+function angDiff(a, b){ let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return Math.abs(d); }
+
+/* ══ target: real player in a run, a wandering ghost on the menu ════ */
+let demoA = 0;
+function aim(){
+  if (S.mode === 'play') return { x:P.x, y:P.y, vx:P.vx, vy:P.vy };
+  return {
+    x: W * (0.5 + 0.3 * Math.sin(demoA * 0.7)),
+    y: H * (0.5 + 0.28 * Math.sin(demoA * 1.13 + 1)),
+    vx: W * 0.3 * 0.7 * Math.cos(demoA * 0.7),
+    vy: H * 0.28 * 1.13 * Math.cos(demoA * 1.13 + 1)
+  };
+}
+
+/* ══ difficulty ═════════════════════════════════════════════════════ */
+const UNLOCK = [
+  { k:'line', at:0,  w:5   },
+  { k:'aoe',  at:7,  w:3   },
+  { k:'beam', at:12, w:2.6 },
+  { k:'orb',  at:18, w:1.2 },
+  { k:'wall', at:24, w:1.7 }
+];
+function diff(){
+  if (S.mode !== 'play') return { sm:1.2, tel:0.85, gap:1.0, clut:1.3, cap:40 };
+  const t = S.t;
+  // Warm-up: the first five seconds run at reduced speed with the spawn clocks
+  // stretched, so a run opens calmly and reaches its real pace at t = 5.
+  const ease = Math.min(1, t / 5);
+  const slack = 1 + (1 - ease) * 1.1;          // gaps up to 2.1x longer at t = 0
+  return {
+    sm:   Math.min(2.15, 1 + t * 0.014) * (0.72 + 0.28 * ease),
+    tel:  Math.max(0.38, 1.0 - t * 0.007),
+    gap:  Math.max(0.34, 1.3 - t * 0.011) * slack,
+    clut: Math.max(0.5, 1.7 - t * 0.016) * slack,
+    cap: 46
+  };
+}
+function pickKind(){
+  const t = S.mode === 'play' ? S.t : 22;
+  const pool = UNLOCK.filter(u => t >= u.at);
+  let total = 0; for (const u of pool) total += u.w;
+  let r = Math.random() * total;
+  for (const u of pool) { r -= u.w; if (r <= 0) return u.k; }
+  return 'line';
+}
+
+/* ══ hazards ════════════════════════════════════════════════════════ */
+function spawn(){
+  const d = diff();
+  if (S.haz.length > d.cap) return;
+  const k = pickKind();
+  const a = aim();
+  if (k === 'line')  return S.haz.push(mkLine(a, d));
+  if (k === 'aoe')   return S.haz.push(mkAoe(a, d));
+  if (k === 'beam')  return S.haz.push(mkBeam(a, d));
+  if (k === 'orb')   return S.haz.push(mkOrb(a, d));
+  if (k === 'wall')  return S.haz.push(mkWall(a, d));
+}
+function mkLine(a, d){
+  const f = edgePointFar(40 * U, a.x, a.y, DIAG * 0.52);
+  const sp = rnd(280, 375) * U * d.sm;
+  // No telegraph — the shot IS the warning. You read the travelling projectile.
+  // Solve roughly for where the target will be when it arrives, then either fire at
+  // that point (punishes running one direction) or at where they are right now
+  // (punishes standing still). Both need to be accurate to be worth dodging.
+  const flight = Math.hypot(a.x - f.x, a.y - f.y) / sp;
+  const lead = Math.random() < 0.45 ? rnd(0.6, 1) : 0;
+  const sprd = Math.max(5, 12 - (S.mode === 'play' ? S.t : 20) * 0.08) * U;
+  const tx = clamp(a.x + a.vx * flight * lead + rnd(-sprd, sprd), 0, W);
+  const ty = clamp(a.y + a.vy * flight * lead + rnd(-sprd, sprd), 0, H);
+  return { k:'line', x:f.x, y:f.y, a:Math.atan2(ty - f.y, tx - f.x),
+    sp, len: rnd(32, 59) * U, w: rnd(7, 12) * U,
+    tel:0, life:0, gz:false };
+}
+function mkAoe(a, d){
+  const r = rnd(46, 82) * U;
+  return { k:'aoe', x: clamp(a.x + rnd(-52, 52) * U, r * .4, W - r * .4),
+    y: clamp(a.y + rnd(-52, 52) * U, r * .4, H - r * .4),
+    r, tel: d.tel * 1.3, boom:0.19, life:0, gz:false };
+}
+// Ambient traffic: same lethal red line, but thrown at a random point in the arena
+// rather than at you. Fills the screen with lanes you have to route around while
+// you're busy dodging the shots that ARE aimed at you.
+function mkStray(d){
+  const tx = rnd(W * 0.06, W * 0.94), ty = rnd(H * 0.06, H * 0.94);
+  const f = edgePointFar(40 * U, tx, ty, DIAG * 0.4);
+  return { k:'line', x:f.x, y:f.y, a:Math.atan2(ty - f.y, tx - f.x),
+    sp: rnd(215, 385) * U * Math.min(d.sm, 1.9),
+    len: rnd(24, 66) * U, w: rnd(6, 13) * U,
+    tel:0, life:0, gz:false };
+}
+// Lux R / Jhin W: a fixed line paints itself across the arena, then the whole line
+// fires at once. No travel, no rotation — you sidestep out of the band or you don't.
+function mkBeam(a, d){
+  const tel = d.tel * 1.05;
+  const lead = Math.random() < 0.5 ? rnd(0.6, 1) : 0;
+  const sprd = Math.max(4, 10 - (S.mode === 'play' ? S.t : 20) * 0.06) * U;
+  const tx = clamp(a.x + a.vx * tel * lead + rnd(-sprd, sprd), 0, W);
+  const ty = clamp(a.y + a.vy * tel * lead + rnd(-sprd, sprd), 0, H);
+  const ang = rnd(0, Math.PI * 2);
+  return { k:'beam', x: tx - Math.cos(ang) * DIAG, y: ty - Math.sin(ang) * DIAG,
+    a: ang, w: rnd(66, 104) * U, tel, fire:0.22, fade:0.3, life:0, gz:false };
+}
+function mkOrb(a, d){
+  const f = edgePoint(30 * U);
+  return { k:'orb', x:f.x, y:f.y, a:Math.atan2(a.y - f.y, a.x - f.x),
+    sp: rnd(148, 190) * U * d.sm, r: 10 * U, turn: rnd(1.7, 2.6),
+    track: rnd(1.5, 2.5), tel: d.tel * 0.7, life:0, gz:false };
+}
+// A laser boomerang: a bladed energy chevron that tumbles slowly across the arena on
+// a fixed heading while spinning about its own belly. Denies space, and the spin
+// means the safe gap moves — you time your pass rather than just walking round it.
+function mkWall(a, d){
+  const L = Math.min(W, H) * rnd(0.13, 0.16);      // arm length from the elbow
+  const phi = rnd(0.85, 1.05);                      // half-angle between the two arms
+  const f = edgePoint(10 * U);
+  return { k:'wall', x:f.x, y:f.y,
+    dir: Math.atan2(a.y - f.y, a.x - f.x) + rnd(-0.18, 0.18),
+    L, phi, t: 8.5 * U,                             // half-thickness at the elbow
+    rot: rnd(0, Math.PI * 2),
+    spin: rnd(1.1, 2.0) * (Math.random() < 0.5 ? 1 : -1),
+    sp: rnd(96, 132) * U * Math.min(d.sm, 1.7),
+    tel: d.tel * 0.7, life:0, gz:false };
+}
+// Both arms in world space: elbow at h.x/h.y, tips swung out by phi and spun by rot.
+function wallArms(h){
+  const c = Math.cos(h.rot), s = Math.sin(h.rot);
+  const lx = Math.sin(h.phi) * h.L, ly = -Math.cos(h.phi) * h.L;
+  return [
+    [h.x + (-lx) * c - ly * s, h.y + (-lx) * s + ly * c],
+    [h.x + ( lx) * c - ly * s, h.y + ( lx) * s + ly * c]
+  ];
+}
+// distance from the player to one arm, whose radius tapers elbow → tip
+function armDist(ax, ay, bx, by, rA, rB, pr){
+  const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy;
+  let u = L2 ? ((P.x - ax) * dx + (P.y - ay) * dy) / L2 : 0;
+  u = clamp(u, 0, 1);
+  return Math.hypot(P.x - (ax + dx * u), P.y - (ay + dy * u)) - (rA + (rB - rA) * u + pr);
+}
+
+function stepHaz(h, dt){
+  h.life += dt;
+  if (h.k === 'line') {
+    if (h.life > h.tel) { h.x += Math.cos(h.a) * h.sp * dt; h.y += Math.sin(h.a) * h.sp * dt; }
+    const m = 240 * U;
+    return h.x > -m && h.x < W + m && h.y > -m && h.y < H + m;
+  }
+  if (h.k === 'aoe') return h.life < h.tel + h.boom + 0.4;
+  if (h.k === 'beam') return h.life < h.tel + h.fire + h.fade;
+  if (h.k === 'orb') {
+    if (h.life > h.tel) {
+      if (h.life < h.tel + h.track) {
+        const a = aim();
+        const want = Math.atan2(a.y - h.y, a.x - h.x);
+        let d2 = ((want - h.a + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        h.a += clamp(d2, -h.turn * dt, h.turn * dt);
+      }
+      h.x += Math.cos(h.a) * h.sp * dt; h.y += Math.sin(h.a) * h.sp * dt;
+    }
+    const m = 240 * U;
+    return h.life < h.tel + h.track + 8 && h.x > -m && h.x < W + m && h.y > -m && h.y < H + m;
+  }
+  if (h.k === 'wall') {
+    if (h.life > h.tel) {
+      h.x += Math.cos(h.dir) * h.sp * dt;
+      h.y += Math.sin(h.dir) * h.sp * dt;
+      h.rot += h.spin * dt;                     // tumbles end over end as it flies
+    }
+    const m = h.L + 90 * U;
+    return h.x > -m && h.x < W + m && h.y > -m && h.y < H + m;
+  }
+  return false;
+}
+
+function hits(h){
+  const pr = P.r * U;
+  if (h.k === 'line') {
+    const bx = h.x - Math.cos(h.a) * h.len, by = h.y - Math.sin(h.a) * h.len;
+    return segDist(P.x, P.y, h.x, h.y, bx, by) - (h.w / 2 + pr);
+  }
+  if (h.k === 'aoe') {
+    if (h.life < h.tel || h.life > h.tel + h.boom) return 1e9;
+    return Math.hypot(P.x - h.x, P.y - h.y) - (h.r + pr);
+  }
+  if (h.k === 'beam') {
+    if (h.life < h.tel || h.life > h.tel + h.fire) return 1e9;
+    const dx = P.x - h.x, dy = P.y - h.y;
+    return Math.abs(-dx * Math.sin(h.a) + dy * Math.cos(h.a)) - (h.w / 2 + pr);
+  }
+  if (h.k === 'orb') {
+    if (h.life <= h.tel) return 1e9;
+    return Math.hypot(P.x - h.x, P.y - h.y) - (h.r + pr);
+  }
+  if (h.k === 'wall') {
+    if (h.life <= h.tel) return 1e9;
+    const [A, B] = wallArms(h);
+    return Math.min(
+      armDist(h.x, h.y, A[0], A[1], h.t * 0.9, h.t * 0.22, pr),
+      armDist(h.x, h.y, B[0], B[1], h.t * 0.9, h.t * 0.22, pr)
+    );
+  }
+  return 1e9;
+}
+
+/* ══ particles ══════════════════════════════════════════════════════ */
+function burst(x, y, col, n, sp){
+  if (REDUCED) n = Math.min(n, 4);
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = rnd(sp * 0.35, sp) * U;
+    S.parts.push({ x, y, vx:Math.cos(a) * v, vy:Math.sin(a) * v, l:0, m:rnd(.3,.7), c:col, r:rnd(1.4,3.2) * U });
+  }
+}
+
+/* ══ ads ════════════════════════════════════════════════════════════
+   One adapter, two backends. On device it drives @capacitor-community/admob
+   (v7 API: prepare* then show*). In a browser it runs the placeholder overlay
+   below so the whole flow — timing, reward gating, resume — is testable without
+   a build. Game code only ever calls Ads.interstitial() / Ads.rewarded().
+
+   AD_UNITS below are the live production units from the AdMob console.
+   To test ad flows on a device without generating invalid traffic, register
+   the device under AdMob > Settings > Test devices — do not flip these back
+   to Google's sample IDs in a shipped build.
+   ------------------------------------------------------------------- */
+const AD_TESTING = false;
+
+// Google's UMP only honours a forced debug geography for a device whose UMP hashed
+// ID is listed here. Leave it empty and real geography applies — which for a UK or
+// EEA player is the consent flow anyway. To force the form somewhere else, run the
+// app once and copy the hashed ID the UMP SDK prints to logcat.
+const AD_DEBUG_DEVICE = '';
+const AD_UNITS = {
+  interstitial: { android:'ca-app-pub-4625958262504617/4022198539',
+                  ios:    'ca-app-pub-4625958262504617/2343275033' },
+  rewarded:     { android:'ca-app-pub-4625958262504617/4944503165',
+                  ios:    'ca-app-pub-4625958262504617/5432472805' },
+  // Rewarded interstitial (still labelled beta by Google). Separate unit type in
+  // the AdMob console — an ordinary rewarded unit will not serve here.
+  bonus:        { android:'ca-app-pub-4625958262504617/6568470824',
+                  ios:    'ca-app-pub-4625958262504617/6745554476' }
+};
+
+// The plugin ships these as TS enums, which cannot be imported without a bundler,
+// so the raw event names. They are part of the plugin's public API.
+const AD_EV = {
+  rewarded: { reward:'onRewardedVideoAdReward',
+              dismiss:'onRewardedVideoAdDismissed',
+              failShow:'onRewardedVideoAdFailedToShow' },
+  bonus:    { reward:'onRewardedInterstitialAdReward',
+              dismiss:'onRewardedInterstitialAdDismissed',
+              failShow:'onRewardedInterstitialAdFailedToShow' }
+};
+
+const Ads = {
+  plugin(){ const C = window.Capacitor; return (C && C.Plugins && C.Plugins.AdMob) || null; },
+  platform(){ const C = window.Capacitor; return (C && C.getPlatform) ? C.getPlatform() : 'web'; },
+  unit(kind){ return AD_UNITS[kind][this.platform() === 'ios' ? 'ios' : 'android']; },
+
+  // Both platforms stringify this before it crosses the bridge — verified in the
+  // plugin's AdConsentExecutor.java and ConsentExecutor.swift, which return
+  // "REQUIRED" / "NOT_REQUIRED" / "OBTAINED" / "UNKNOWN". No enum shape to guess at.
+  needsConsent(status){ return status === 'REQUIRED'; },
+  privacyOptionsRequired: false,
+
+  // EEA/UK users must be asked before personalised ads serve. Runs BEFORE
+  // initialize(), which is the order Google's UMP documentation requires.
+  async consent(){
+    const AdMob = this.plugin();
+    if (!AdMob || !AdMob.requestConsentInfo) return;
+    try {
+      // debugGeography is an INT on both platforms (1 = EEA), not a string — passing
+      // 'EEA' made Android throw on unboxing and iOS fall through to "disabled", so
+      // the setting did nothing at all. It also needs the device's UMP hashed ID.
+      const debug = AD_TESTING && AD_DEBUG_DEVICE
+        ? { debugGeography: 1, testDeviceIdentifiers: [AD_DEBUG_DEVICE] }
+        : {};
+      const info = await AdMob.requestConsentInfo(debug);
+      let state = info;
+      if (info && this.needsConsent(info.status) && info.isConsentFormAvailable) {
+        state = await AdMob.showConsentForm();
+      }
+      // If Google says a persistent "privacy options" entry point is required,
+      // the menu has to offer one. Not optional — it's a condition of serving.
+      this.privacyOptionsRequired =
+        !!state && state.privacyOptionsRequirementStatus === 'REQUIRED';
+      syncPrivacyButton();
+    } catch (e) {
+      // Never block the game on this. Without consent Google serves
+      // non-personalised ads rather than nothing.
+      console.warn('[ads] consent flow unavailable', e);
+    }
+  },
+
+  async showPrivacyOptions(){
+    const AdMob = this.plugin();
+    if (!AdMob || !AdMob.showPrivacyOptionsForm) return;
+    try { await AdMob.showPrivacyOptionsForm(); }
+    catch (e) { console.warn('[ads] privacy options form failed', e); }
+  },
+
+  async init(){
+    const AdMob = this.plugin();
+    if (!AdMob) return;
+    try {
+      // iOS needs App Tracking Transparency before personalised ads can serve.
+      if (this.platform() === 'ios' && AdMob.requestTrackingAuthorization) {
+        await AdMob.requestTrackingAuthorization();
+      }
+      await this.consent();
+      await AdMob.initialize({ initializeForTesting: AD_TESTING });
+    } catch (e) { console.warn('[ads] init failed', e); }
+  },
+
+  async interstitial(){
+    const AdMob = this.plugin();
+    if (!AdMob) return simAd('interstitial', 4);
+    try {
+      await AdMob.prepareInterstitial({ adId: this.unit('interstitial'), isTesting: AD_TESTING });
+      await AdMob.showInterstitial();
+    } catch (e) { console.warn('[ads] interstitial skipped', e); }
+    return true;
+  },
+
+  // showRewardVideoAd() and showRewardInterstitialAd() both resolve the moment the
+  // reward event fires — which is while the ad is still on screen. Resolving there
+  // would start the 3-2-1 underneath a playing ad and the player would lose most of
+  // it. So: wait for the DISMISS event, and use the reward event only to decide
+  // whether it was earned.
+  async watch(AdMob, ev, showFn){
+    let earned = false, settle = null;
+    const handles = [];
+    const done = new Promise(r => { settle = r; });
+    const reg = async (name, fn) => {
+      try { handles.push(await AdMob.addListener(name, fn)); }
+      catch (e) { console.warn('[ads] listener failed', name, e); }
+    };
+    await reg(ev.reward,   () => { earned = true; });
+    await reg(ev.dismiss,  () => settle());
+    await reg(ev.failShow, () => settle());
+    // If a platform ever stops emitting dismiss, the game must not hang on it.
+    const guard = setTimeout(() => settle(), 120000);
+    // Deliberately NOT awaited. Dismiss an Android rewarded ad without earning and
+    // the plugin's call is never resolved or rejected at all — awaiting it here
+    // would leave the death screen locked behind a promise that never settles.
+    Promise.resolve().then(showFn).catch(e => { console.warn('[ads] show failed', e); settle(); });
+    await done;
+    clearTimeout(guard);
+    for (const h of handles) { try { h.remove(); } catch(_){} }
+    return earned;
+  },
+
+  // Resolves true only when the reward is actually earned.
+  async rewarded(){
+    const AdMob = this.plugin();
+    if (!AdMob) return simAd('rewarded', 5);
+    try {
+      await AdMob.prepareRewardVideoAd({ adId: this.unit('rewarded'), isTesting: AD_TESTING });
+    } catch (e) {
+      // No fill / offline. Our problem, not the player's — grant the revive.
+      console.warn('[ads] no rewarded ad available, granting anyway', e);
+      return true;
+    }
+    return this.watch(AdMob, AD_EV.rewarded, () => AdMob.showRewardVideoAd());
+  },
+
+  // Rewarded interstitial. Unlike a rewarded video the player does not have to opt
+  // in, so Google requires an intro screen carrying the reward and a way out before
+  // the ad starts. adIntro() is that screen, and it is only shown once an ad is
+  // actually loaded — never promise a reward that cannot be delivered.
+  async bonus(){
+    const AdMob = this.plugin();
+    if (!AdMob) return (await adIntro()) ? simAd('bonus', 5) : false;
+    if (!AdMob.prepareRewardInterstitialAd) {   // older plugin build
+      await this.interstitial(); return false;
+    }
+    try {
+      await AdMob.prepareRewardInterstitialAd({ adId: this.unit('bonus'), isTesting: AD_TESTING });
+    } catch (e) {
+      // No fill. Fall back to the plain interstitial so the slot still earns, and
+      // say nothing about a bonus the player was never offered.
+      console.warn('[ads] no rewarded interstitial, falling back', e);
+      await this.interstitial();
+      return false;
+    }
+    if (!await adIntro()) return false;         // opted out — show nothing at all
+    return this.watch(AdMob, AD_EV.bonus, () => AdMob.showRewardInterstitialAd());
+  }
+};
+
+// The intro screen. Five seconds and the ad rolls; either button ends the wait.
+// Resolves true if the player takes the ad.
+function adIntro(){
+  return new Promise(resolve => {
+    const cnt = document.getElementById('introcount');
+    const watch = document.getElementById('introwatch');
+    const skip = document.getElementById('introskip');
+    let left = 5, iv = 0, done = false;
+    const finish = take => {
+      if (done) return;
+      done = true; clearInterval(iv);
+      watch.onclick = skip.onclick = null;
+      show('adintro', false);
+      resolve(take);
+    };
+    cnt.textContent = 'AD STARTS IN ' + left;
+    show('adintro', true);
+    iv = setInterval(() => {
+      left--;
+      cnt.textContent = left > 0 ? 'AD STARTS IN ' + left : '';
+      if (left <= 0) finish(true);
+    }, 1000);
+    watch.onclick = () => finish(true);
+    skip.onclick = () => finish(false);
+  });
+}
+
+// Browser placeholder that mimics the real thing closely enough to design against.
+function simAd(kind, secs){
+  return new Promise(resolve => {
+    const kindEl = document.getElementById('adkind');
+    const fill = document.getElementById('adfill');
+    const timeEl = document.getElementById('adtime');
+    const btn = document.getElementById('adskip');
+    const rewarding = kind !== 'interstitial';
+    kindEl.textContent = kind === 'rewarded' ? 'REWARDED VIDEO'
+                       : kind === 'bonus'    ? 'REWARDED INTERSTITIAL' : 'INTERSTITIAL';
+    btn.textContent = kind === 'rewarded' ? 'SKIP — NO REVIVE'
+                    : kind === 'bonus'    ? 'SKIP — NO BONUS' : 'CLOSE';
+    btn.disabled = !rewarding;
+    fill.style.width = '0%'; timeEl.textContent = secs;
+    show('adslot', true);
+    const t0 = performance.now();
+    let done = false;
+    const finish = ok => {
+      if (done) return;
+      done = true; clearInterval(iv); btn.onclick = null;
+      show('adslot', false); resolve(ok);
+    };
+    const iv = setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / (secs * 1000));
+      fill.style.width = (k * 100) + '%';
+      timeEl.textContent = k >= 1 ? '' : Math.ceil(secs * (1 - k));
+      if (k >= 1) { if (rewarding) finish(true); else btn.disabled = false; }
+    }, 60);
+    btn.onclick = () => finish(!rewarding);
+  });
+}
+
+/* ══ run control ════════════════════════════════════════════════════ */
+function startRun(){
+  S.mode = 'play'; S.t = 0; S.haz.length = 0; S.parts.length = 0; S.trail.length = 0;
+  S.spawnT = 1.2; S.clutterT = 1.0; S.grazes = 0; S.shake = 0; S.flash = 0;
+  S.revives = 0; S.adRevive = true;          // S.bonus survives — it was earned for this run
+  S.count = 0; S.grace = 0; S.rec = null; resetStick();
+  P.x = W / 2; P.y = H * 0.62; P.r = 9; P.fx = 0; P.fy = -1; P.vx = 0; P.vy = 0;
+  P.dashT = 0; P.ghostT = 0; P.inv = 0.6;
+  CD.flash = CD.dash = CD.ghost = 0;
+  show('menu', false); show('over', false); show('pause', false);
+  document.getElementById('hud').classList.add('on');
+  syncAbilButtons();
+  toast('GO');
+}
+function die(){
+  // Count the RUN, not the death. A revived run dies twice; counting both drifted
+  // the every-third-death ad cadence to roughly every second run.
+  S.mode = 'over'; if (!S.revives) S.deaths++; resetStick();
+  S.count = 0; syncCount();
+  burst(P.x, P.y, C.ember, REDUCED ? 8 : 34, 320);
+  S.shake = REDUCED ? 0 : 16 * U; S.flash = 1;
+  buzz([30, 40, 60]);
+  document.getElementById('hud').classList.remove('on');
+  const t = S.t;
+  const prevBest = S.best;
+  const rec = save(t);
+  document.getElementById('otime').textContent = fmt(t);
+  document.getElementById('osub').textContent =
+    `${S.grazes} grazes · ${loadWords()}` +
+    (S.revives === 1 ? ' · revived' : S.revives > 1 ? ` · revived ×${S.revives}` : '');
+  document.getElementById('orec').style.display = rec ? 'inline-block' : 'none';
+  if (!rec && prevBest) {
+    document.getElementById('osub').textContent += ` · best ${fmt(prevBest)}`;
+  }
+  syncReviveButton();
+  render();
+  show('over', true);
+}
+
+// Interstitial on every other death — fired when the player LEAVES the death
+// screen, so they always read their own time before an ad appears.
+async function adGate(){
+  // Every third death. Early runs last seconds, so every other death meant a
+  // reviewer could hit several ads in two minutes and read it as disruptive.
+  if (S.deaths % 3 !== 0 || S.lastAdDeath === S.deaths) return;
+  S.lastAdDeath = S.deaths;
+  // A rewarded interstitial fills the same slot, pays better, and hands the player
+  // something back. Only offer it when there is a reward left to give — with one
+  // already banked the honest thing is the plain interstitial.
+  if (S.bonus > 0) { await Ads.interstitial(); return; }
+  if (await Ads.bonus()) {
+    S.bonus = 1;
+    // 'GO' fires the instant the run starts; let it clear before saying this.
+    setTimeout(() => toast('SECOND REVIVE BANKED'), 1100);
+  }
+}
+// An ad request can take ten seconds and shows nothing on screen while it loads.
+// Without this the death-screen buttons stayed live: a second tap of RETRY, or
+// RETRY then MENU, ran two run-starts and left the game and the overlay fighting
+// each other. One request at a time, buttons locked, and every await re-checks
+// that the screen it was started from is still the screen we are on.
+let uiTok = 0;
+function lockOver(lock){
+  document.getElementById('again').disabled = lock;
+  document.getElementById('tomenu').disabled = lock;
+  document.getElementById('revive').disabled = lock || !reviveOffer();
+}
+
+// Two ways back into a run: the rewarded video, once per run, and a bonus revive
+// banked from a rewarded interstitial, which costs nothing to spend. The free one
+// goes first — the player already paid for it with their attention.
+function reviveOffer(){
+  if (S.bonus > 0) return 'free';
+  if (S.adRevive) return 'ad';
+  return null;
+}
+function syncReviveButton(){
+  const rv = document.getElementById('revive');
+  const o = reviveOffer();
+  rv.disabled = !o || S.busy;
+  rv.textContent = o === 'free' ? '↻ SECOND REVIVE — FREE'
+                 : o === 'ad'   ? '↻ REVIVE — WATCH AD'
+                 : '↻ REVIVE USED';
+}
+function resumeRun(){
+  S.revives++;
+  S.haz.length = 0; S.parts.length = 0;
+  P.inv = 0; S.grace = 1.4; S.mode = 'play'; S.spawnT = 0.8; S.clutterT = 0.9;
+  S.count = 3; resetStick();
+  show('over', false);
+  document.getElementById('hud').classList.add('on');
+}
+async function retry(){
+  if (S.busy) return;
+  const tok = ++uiTok; S.busy = true; lockOver(true);
+  await adGate();
+  S.busy = false; lockOver(false);
+  if (tok !== uiTok || S.mode !== 'over') return;
+  startRun();
+}
+
+async function revive(){
+  const offer = reviveOffer();
+  if (S.busy || !offer) return;
+  if (offer === 'free') { S.bonus--; resumeRun(); return; }   // banked, no ad
+  const tok = ++uiTok; S.busy = true; lockOver(true);
+  document.getElementById('revive').textContent = '↻ LOADING AD…';
+  const earned = await Ads.rewarded();
+  S.busy = false;
+  if (tok !== uiTok || S.mode !== 'over') return;   // player left while it loaded
+  if (!earned) {
+    // Not burnt — they can try again. Only a real dismissal refuses the revive.
+    lockOver(false); syncReviveButton(); toast('NO REWARD'); return;
+  }
+  S.adRevive = false;
+  lockOver(false); syncReviveButton();
+  resumeRun();
+}
+async function toMenu(){
+  if (S.busy) return;
+  const tok = ++uiTok; S.busy = true; lockOver(true);
+  await adGate();
+  S.busy = false; lockOver(false);
+  if (tok !== uiTok) return;
+  goMenu();
+}
+function goMenu(){
+  S.mode = 'menu'; S.count = 0; S.grace = 0; syncCount();
+  S.haz.length = 0; S.spawnT = 0.4; S.clutterT = 0.5;
+  document.getElementById('hud').classList.remove('on');
+  show('over', false); show('pause', false); show('menu', true);
+  render();
+}
+function setPause(on){
+  if (on && S.mode === 'play') {
+    // Clear any running countdown: it is drawn above the pause panel, and update()
+    // does not run while paused, so nothing else would ever take it down.
+    S.mode = 'paused'; S.count = 0; S.grace = 0; syncCount(); resetStick();
+    show('pause', true); document.getElementById('hud').classList.remove('on');
+  }
+  else if (!on && S.mode === 'paused') {
+    // No invulnerability on resume. The world is frozen and fully visible for the
+    // three-count, so nothing has changed while you were away — and handing out a
+    // grace window here would make pause-spam a way to walk through shots.
+    S.mode = 'play'; S.count = 3; resetStick();
+    show('pause', false); document.getElementById('hud').classList.add('on');
+  }
+}
+document.addEventListener('visibilitychange', () => { if (document.hidden) setPause(true); });
+
+// Android's back gesture. The game is one page with no history, so without this
+// Capacitor hands the press to the system and the activity closes — and since the
+// floating stick is often dragged near an edge, an accidental back swipe would kill
+// a run outright. Registering any listener also switches off Capacitor's default
+// handling, which is why leaving the app is now an explicit exitApp() from the menu.
+(function backButton(){
+  const C = window.Capacitor;
+  const App = C && C.Plugins && C.Plugins.App;
+  if (!App || !App.addListener) return;                 // web, or plugin missing
+  App.addListener('backButton', () => {
+    if (S.busy) return;                                 // an ad request is in flight
+    if (document.getElementById('adintro').classList.contains('on')) {
+      document.getElementById('introskip').click();     // back means "no thanks"
+      return;
+    }
+    if (S.mode === 'play')   { setPause(true);  return; }
+    if (S.mode === 'paused') { setPause(false); return; }
+    // Back out of the death screen with no ad. Google's guidance is not to put an
+    // interstitial in front of someone navigating away, and the slot is not lost:
+    // adGate() was never called, so the same death still owes an ad the next time
+    // the player leaves a death screen deliberately.
+    if (S.mode === 'over')   { goMenu(); return; }
+    if (App.exitApp) App.exitApp();                     // on the menu: actually leave
+  });
+})();
+
+/* ══ update ═════════════════════════════════════════════════════════ */
+function update(dt){
+  // 3-2-1 after a resume or a revive: world frozen, player safe, clock stopped
+  if (S.count > 0) {
+    S.count -= dt;
+    P.inv = Math.max(0, P.inv - dt);          // can't be banked across a pause
+    if (S.count <= 0) {
+      S.count = 0;
+      if (S.grace > 0) { P.inv = Math.max(P.inv, S.grace); S.grace = 0; }
+      toast('GO');
+    }
+    syncCount();
+    return;
+  }
+  demoA += dt;
+  const playing = S.mode === 'play';
+
+  if (playing) {
+    S.t += dt;
+    for (const k in CD) if (CD[k] > 0) CD[k] = Math.max(0, CD[k] - dt);
+    P.inv = Math.max(0, P.inv - dt);
+    P.ghostT = Math.max(0, P.ghostT - dt);
+
+    // movement
+    let ix = stick.dx, iy = stick.dy;
+    if (!stick.on) { const kv = keyVec(); ix = kv[0]; iy = kv[1]; }
+    let m = Math.hypot(ix, iy);
+    if (m > 1) { ix /= m; iy /= m; m = 1; }
+    if (m > 0.12) { P.fx = ix / m; P.fy = iy / m; }
+
+    let sp = BASE_SPEED * U * (P.ghostT > 0 ? GHOST_MUL : 1);
+    const x0 = P.x, y0 = P.y;
+    if (P.dashT > 0) {
+      P.dashT -= dt;
+      P.x += P.fx * sp * DASH_MUL * dt;
+      P.y += P.fy * sp * DASH_MUL * dt;
+    } else {
+      P.x += ix * sp * dt;
+      P.y += iy * sp * dt;
+    }
+    const pr = P.r * U;
+    P.x = clamp(P.x, pr, W - pr); P.y = clamp(P.y, pr, H - pr);
+
+    // smoothed velocity, capped so a dash doesn't send every lead shot into orbit
+    let nvx = (P.x - x0) / dt, nvy = (P.y - y0) / dt;
+    const cap = BASE_SPEED * U * GHOST_MUL, nm = Math.hypot(nvx, nvy);
+    if (nm > cap) { nvx *= cap / nm; nvy *= cap / nm; }
+    const k = Math.min(1, dt * 9);
+    P.vx += (nvx - P.vx) * k; P.vy += (nvy - P.vy) * k;
+
+    S.trail.push({ x:P.x, y:P.y, l:0 });
+    if (S.trail.length > 14) S.trail.shift();
+  }
+  for (const p of S.trail) p.l += dt;
+
+  // spawning — aimed threats on one clock, ambient traffic on another
+  S.spawnT -= dt;
+  if (S.spawnT <= 0) {
+    const d = diff();
+    spawn();
+    if (playing && S.t > 34 && Math.random() < 0.22) spawn();   // volleys late
+    S.spawnT = d.gap * rnd(0.8, 1.25);
+  }
+  if (!playing || S.t > 3) {                      // ambient traffic holds off at first
+    S.clutterT -= dt;
+    if (S.clutterT <= 0) {
+      const d = diff();
+      if (S.haz.length < d.cap) S.haz.push(mkStray(d));
+      S.clutterT = d.clut * rnd(0.75, 1.3);
+    }
+  }
+
+  // hazards + collision
+  for (let i = S.haz.length - 1; i >= 0; i--) {
+    const h = S.haz[i];
+    if (!stepHaz(h, dt)) { S.haz.splice(i, 1); continue; }
+    if (!playing) continue;
+    const d = hits(h);
+    if (d < 0 && P.inv <= 0) { die(); return; }
+    if (d >= 0 && d < 14 * U && !h.gz) { h.gz = true; S.grazes++; buzz(6); }
+  }
+
+  // particles
+  for (let i = S.parts.length - 1; i >= 0; i--) {
+    const p = S.parts[i];
+    p.l += dt;
+    if (p.l > p.m) { S.parts.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.94; p.vy *= 0.94;
+  }
+
+  S.shake *= 0.88;
+  S.flash = Math.max(0, S.flash - dt * 2.2);
+  if (playing) syncHud();
+}
+
+/* ══ draw ═══════════════════════════════════════════════════════════ */
+function draw(){
+  ctx.save();
+  if (S.shake > 0.4) ctx.translate(rnd(-S.shake, S.shake), rnd(-S.shake, S.shake));
+
+  ctx.fillStyle = C.void; ctx.fillRect(-40, -40, W + 80, H + 80);
+
+  // arena grid
+  const g = 44 * U;
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 1; ctx.globalAlpha = 0.75;
+  ctx.beginPath();
+  for (let x = (W % g) / 2; x < W; x += g) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+  for (let y = (H % g) / 2; y < H; y += g) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+  ctx.stroke(); ctx.globalAlpha = 1;
+
+  const menuDim = S.mode !== 'play';
+  ctx.globalAlpha = menuDim ? 0.55 : 1;
+
+  for (const h of S.haz) drawHaz(h);
+
+  // trail
+  ctx.globalAlpha = menuDim ? 0.3 : 1;
+  if (S.mode === 'play' || S.mode === 'paused') {
+    for (let i = 0; i < S.trail.length; i++) {
+      const p = S.trail[i], k = i / S.trail.length;
+      ctx.globalAlpha = k * 0.22;
+      ctx.fillStyle = P.ghostT > 0 ? C.hex : C.mana;
+      ctx.beginPath(); ctx.arc(p.x, p.y, P.r * U * k * 0.85, 0, 6.284); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    drawPlayer();
+  }
+
+  // particles
+  for (const p of S.parts) {
+    ctx.globalAlpha = Math.max(0, 1 - p.l / p.m);
+    ctx.fillStyle = p.c;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.284); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // joystick
+  if (stick.on && S.mode === 'play') {
+    const max = STICK_MAX * U;
+    ctx.strokeStyle = 'rgba(55,225,255,.24)'; ctx.lineWidth = 1.5 * U;
+    ctx.beginPath(); ctx.arc(stick.ox, stick.oy, max, 0, 6.284); ctx.stroke();
+    ctx.fillStyle = 'rgba(55,225,255,.14)';
+    ctx.beginPath(); ctx.arc(stick.cx, stick.cy, 22 * U, 0, 6.284); ctx.fill();
+    ctx.strokeStyle = 'rgba(55,225,255,.5)';
+    ctx.beginPath(); ctx.arc(stick.cx, stick.cy, 22 * U, 0, 6.284); ctx.stroke();
+  }
+
+  if (S.flash > 0) {
+    ctx.fillStyle = `rgba(255,59,92,${S.flash * 0.32})`;
+    ctx.fillRect(-40, -40, W + 80, H + 80);
+  }
+  ctx.restore();
+}
+
+function drawPlayer(){
+  const pr = P.r * U;
+  const col = P.ghostT > 0 ? C.hex : C.mana;
+  if (P.inv > 0 && Math.floor(P.inv * 12) % 2 === 0) ctx.globalAlpha = 0.35;
+  ctx.shadowColor = col; ctx.shadowBlur = 22 * U;
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(P.x, P.y, pr, 0, 6.284); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(P.x, P.y, pr * 0.42, 0, 6.284); ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function drawHaz(h){
+  const t = h.life;
+  if (h.k === 'line') {
+    const bx = h.x - Math.cos(h.a) * h.len, by = h.y - Math.sin(h.a) * h.len;
+    const grd = ctx.createLinearGradient(bx, by, h.x, h.y);
+    grd.addColorStop(0, 'rgba(255,59,92,0)'); grd.addColorStop(1, C.ember);
+    ctx.strokeStyle = grd; ctx.lineWidth = h.w; ctx.lineCap = 'round';
+    ctx.shadowColor = C.ember; ctx.shadowBlur = 16 * U;
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(h.x, h.y); ctx.stroke();
+    ctx.shadowBlur = 0; return;
+  }
+  if (h.k === 'aoe') {
+    if (t < h.tel) {
+      const k = t / h.tel;
+      ctx.fillStyle = `rgba(255,160,46,${0.07 + k * 0.13})`;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 6.284); ctx.fill();
+      ctx.strokeStyle = C.flare; ctx.globalAlpha = 0.35 + k * 0.5; ctx.lineWidth = 2 * U;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 6.284); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = `rgba(255,160,46,${0.2 + k * 0.4})`;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.r * k, 0, 6.284); ctx.fill();
+      return;
+    }
+    const k = clamp((t - h.tel) / (h.boom + 0.4), 0, 1);
+    ctx.fillStyle = `rgba(255,196,120,${(1 - k) * 0.85})`;
+    ctx.shadowColor = C.flare; ctx.shadowBlur = 30 * U;
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.r * (1 + k * 0.12), 0, 6.284); ctx.fill();
+    ctx.shadowBlur = 0; return;
+  }
+  if (h.k === 'beam') {
+    const ex = h.x + Math.cos(h.a) * DIAG * 2.2, ey = h.y + Math.sin(h.a) * DIAG * 2.2;
+    if (t < h.tel) {
+      const k = t / h.tel;
+      // the danger band is shown at full width from the start — nothing hidden
+      ctx.strokeStyle = C.beam; ctx.lineWidth = h.w; ctx.lineCap = 'butt';
+      ctx.globalAlpha = 0.05 + k * 0.1;
+      ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.lineWidth = (1.2 + k * 2.4) * U; ctx.globalAlpha = 0.35 + k * 0.6;
+      ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+      ctx.globalAlpha = 1; return;
+    }
+    const s = t - h.tel;
+    const k = s < h.fire ? 1 : 1 - (s - h.fire) / h.fade;   // full power, then collapse
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = C.beam; ctx.lineWidth = h.w * k;
+    ctx.shadowColor = C.hex; ctx.shadowBlur = 34 * U; ctx.globalAlpha = 0.55 * k;
+    ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = k;
+    ctx.lineWidth = h.w * k * 0.5; ctx.strokeStyle = '#ffffff';
+    ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+    ctx.globalAlpha = 1; return;
+  }
+  if (h.k === 'orb') {
+    const pulse = t < h.tel ? 0.5 + 0.5 * Math.sin(t * 22) : 1;
+    ctx.shadowColor = C.hex; ctx.shadowBlur = 20 * U;
+    ctx.fillStyle = C.hex; ctx.globalAlpha = t < h.tel ? 0.35 + pulse * 0.4 : 1;
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, 6.284); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#f2e2ff'; ctx.globalAlpha *= 0.9;
+    ctx.beginPath(); ctx.arc(h.x, h.y, h.r * 0.38, 0, 6.284); ctx.fill();
+    ctx.globalAlpha = 1; return;
+  }
+  if (h.k === 'wall') {
+    ctx.save();
+    ctx.translate(h.x, h.y); ctx.rotate(h.rot);
+    boomerang(h);
+    if (t < h.tel) {
+      const k = t / h.tel;
+      ctx.strokeStyle = C.acid; ctx.globalAlpha = 0.22 + k * 0.45; ctx.lineWidth = 1.6 * U;
+      ctx.stroke(); ctx.globalAlpha = 1; ctx.restore(); return;
+    }
+    ctx.shadowColor = C.acid; ctx.shadowBlur = 30 * U;
+    ctx.fillStyle = 'rgba(200,255,61,.3)'; ctx.fill(); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = C.acid; ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1;
+    // white-hot spine down each arm
+    const lx = Math.sin(h.phi) * h.L, ly = -Math.cos(h.phi) * h.L;
+    ctx.strokeStyle = '#fcffe9'; ctx.lineWidth = h.t * 0.44; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-lx * 0.78, ly * 0.78); ctx.lineTo(0, h.t * 0.45); ctx.lineTo(lx * 0.78, ly * 0.78);
+    ctx.stroke(); ctx.lineCap = 'butt';
+    ctx.restore();
+  }
+}
+
+// Boomerang outline in local space: elbow at the origin, two pointed arms opening
+// upward, a fat outer heel and a shallow notch on the inside.
+function boomerang(h){
+  const lx = Math.sin(h.phi) * h.L, ly = -Math.cos(h.phi) * h.L, t = h.t;
+  ctx.beginPath();
+  ctx.moveTo(-lx, ly);
+  ctx.quadraticCurveTo(0,  2 * t - ly, lx, ly);     // outer heel
+  ctx.quadraticCurveTo(0, -0.7 * t - ly, -lx, ly);  // inner notch
+  ctx.closePath();
+}
+
+/* ══ HUD sync ═══════════════════════════════════════════════════════ */
+const elTime = document.getElementById('ctime');
+const elGraze = document.getElementById('cgraze');
+const abBtns = {};
+document.querySelectorAll('.ab').forEach(b => {
+  const a = b.dataset.a;
+  abBtns[a] = { el:b, sweep:b.querySelector('.sweep'), num:b.querySelector('.cdnum') };
+  b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); cast(a); });
+});
+let lastCount = -1;
+function syncCount(){
+  const box = document.getElementById('countdown'), n = document.getElementById('cnum');
+  if (S.count <= 0) { box.classList.remove('on'); lastCount = -1; return; }
+  box.classList.add('on');
+  const v = Math.ceil(S.count);
+  if (v !== lastCount) {
+    lastCount = v; n.textContent = v;
+    n.classList.remove('pop'); void n.offsetWidth; n.classList.add('pop');
+  }
+}
+function inThumbZone(x, y){
+  // Only the ability buttons that are actually on screen block the joystick. The
+  // old fixed corner rectangle killed a chunk of a purist run's arena for nothing.
+  for (const a in abBtns) {
+    const el = abBtns[a].el;
+    if (el.classList.contains('hide')) continue;
+    const r = el.getBoundingClientRect(), p = 10 * U;
+    if (x >= r.left - p && x <= r.right + p && y >= r.top - p && y <= r.bottom + p) return true;
+  }
+  return false;
+}
+function syncAbilButtons(){
+  for (const a in abBtns) abBtns[a].el.classList.toggle('hide', !LOAD[a]);
+}
+function syncHud(){
+  elTime.textContent = fmt(S.t);
+  elGraze.textContent = S.grazes;
+  for (const a in abBtns) {
+    if (!LOAD[a]) continue;
+    const o = abBtns[a], c = CD[a];
+    if (c > 0) {
+      const p = 1 - c / CDMAX[a];
+      o.el.classList.remove('ready'); o.el.classList.add('cooling');
+      o.sweep.style.background = `conic-gradient(rgba(4,7,13,0) ${p * 360}deg, rgba(4,7,13,.8) 0)`;
+      o.num.textContent = c > 1 ? Math.ceil(c) : c.toFixed(1);
+    } else if (!o.el.classList.contains('ready')) {
+      o.el.classList.add('ready'); o.el.classList.remove('cooling');
+      o.sweep.style.background = 'transparent';
+      o.num.textContent = '';
+    }
+  }
+}
+
+/* ══ formatting + storage ═══════════════════════════════════════════ */
+function fmt(t){
+  if (t < 60) return t.toFixed(2);
+  const m = Math.floor(t / 60), s = t - m * 60;
+  return m + ':' + (s < 10 ? '0' : '') + s.toFixed(2);
+}
+function loadStr(){
+  return (LOAD.flash ? 'F' : '') + (LOAD.dash ? 'D' : '') + (LOAD.ghost ? 'G' : '');
+}
+function loadWords(){
+  const n = ['flash', 'dash', 'ghost'].filter(k => LOAD[k]);
+  return n.length ? n.join(' + ') : '★ purist run';
+}
+const KEY = 'skillshot.scores.v1';
+
+// Capacitor Preferences writes to native storage, which survives app updates and
+// WebView data clears. Plugins register on window.Capacitor.Plugins on device, so
+// this needs no bundler. On the web there is no bridge, so fall back to localStorage.
+const Store = {
+  plugin(){ const C = window.Capacitor; return (C && C.Plugins && C.Plugins.Preferences) || null; },
+  // Returns {ok,v}. A failed read and an empty store both used to come back as
+  // null, so one bad read wiped the whole leaderboard on the next save.
+  async get(k){
+    const P = this.plugin();
+    if (P) { try { return { ok:true, v:(await P.get({ key: k })).value }; } catch(_){ return { ok:false, v:null }; } }
+    try { return { ok:true, v: localStorage.getItem(k) }; } catch(_){ return { ok:false, v:null }; }
+  },
+  async set(k, v){
+    const P = this.plugin();
+    if (P) { try { await P.set({ key: k, value: v }); } catch(_){} return; }
+    try { localStorage.setItem(k, v); } catch(_){}
+  }
+};
+
+let scores = [], scoresLoaded = false;
+// Never write until we know what is already stored, or we would overwrite a real
+// history with a one-entry array.
+function write(v){ if (scoresLoaded) Store.set(KEY, JSON.stringify(v)); }
+async function loadScores(){
+  const r = await Store.get(KEY);
+  if (!r.ok) { console.warn('[scores] storage unreadable — not saving this session'); render(); return; }
+  scoresLoaded = true;
+  try { const v = JSON.parse(r.v); if (Array.isArray(v)) scores = v; } catch(_){}
+  S.best = scores.length ? scores[0].t : 0;
+  render();
+}
+
+function save(t){
+  const wasBest = !scores.length || t > scores[0].t;
+  // A revived run dies twice. The first death's entry is always the shorter one and
+  // the same run, so replace it rather than leaving a worse duplicate on the board.
+  if (S.rec) { const i = scores.indexOf(S.rec); if (i >= 0) scores.splice(i, 1); }
+  S.rec = { t, g:S.grazes, l:loadStr(), r:S.revives };
+  scores.push(S.rec);
+  scores.sort((a, b) => b.t - a.t);
+  scores = scores.slice(0, 10);
+  write(scores);
+  S.best = scores[0].t;
+  return wasBest && scores[0].t === t;
+}
+function render(){
+  const rows = scores.map((s, i) => {
+    const b = [];
+    if (!s.l) b.push('<span class="badge pure">★ PURIST</span>');
+    else {
+      if (s.l.includes('F')) b.push('<span class="badge f">F</span>');
+      if (s.l.includes('D')) b.push('<span class="badge d">D</span>');
+      if (s.l.includes('G')) b.push('<span class="badge g">G</span>');
+    }
+    // Entries written before the bonus revive stored a boolean here.
+    const rv = s.r === true ? 1 : (s.r | 0);
+    if (rv) b.push(`<span class="badge rev">${rv > 1 ? '↻↻' : '↻'}</span>`);
+    return `<div class="r"><span class="p">${i + 1}</span><span class="meta" style="justify-content:flex-start">${b.join('')}</span><span class="tt">${fmt(s.t)}</span></div>`;
+  });
+  const html = rows.length ? rows.join('')
+    : '<div class="empty">No runs yet. The first one lasts about four seconds.</div>';
+  document.getElementById('board').innerHTML = html;
+  document.getElementById('board2').innerHTML = scores.length
+    ? rows.slice(0, 5).join('') : html;
+  const rc = document.getElementById('runcount');
+  rc.textContent = scores.length ? scores.length + (scores.length === 1 ? ' run' : ' runs') : '';
+}
+
+/* ══ toast ══════════════════════════════════════════════════════════ */
+let toastT = null;
+function toast(msg){
+  const el = document.getElementById('toast');
+  document.getElementById('toastmsg').textContent = msg;
+  el.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('on'), 800);
+}
+
+/* ══ screens + menu wiring ══════════════════════════════════════════ */
+function show(id, on){ document.getElementById(id).classList.toggle('on', on); }
+
+document.querySelectorAll('.card').forEach(c => {
+  c.addEventListener('click', () => {
+    const a = c.dataset.a;
+    LOAD[a] = !LOAD[a];
+    c.classList.toggle('on', LOAD[a]);
+    const n = Object.values(LOAD).filter(Boolean).length;
+    document.getElementById('loadstate').textContent = n ? n + ' armed' : '★ purist';
+  });
+});
+function syncPrivacyButton(){
+  const b = document.getElementById('privacyopts');
+  if (b) b.hidden = !Ads.privacyOptionsRequired;
+}
+document.getElementById('privacyopts').addEventListener('click', () => Ads.showPrivacyOptions());
+document.getElementById('play').addEventListener('click', startRun);
+document.getElementById('again').addEventListener('click', retry);
+document.getElementById('tomenu').addEventListener('click', toMenu);
+document.getElementById('revive').addEventListener('click', revive);
+document.getElementById('pausebtn').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); setPause(true); });
+document.getElementById('resume').addEventListener('click', () => setPause(false));
+document.getElementById('quit').addEventListener('click', () => { show('pause', false); die(); });
+
+/* ══ loop ═══════════════════════════════════════════════════════════ */
+let last = 0;
+function frame(now){
+  requestAnimationFrame(frame);
+  if (!last) { last = now; return; }
+  let dt = (now - last) / 1000; last = now;
+  if (dt > 0.05) dt = 0.05;
+  if (S.mode !== 'paused') update(dt);
+  draw();
+}
+
+resize();
+render();
+syncAbilButtons();
+loadScores();
+Ads.init();
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>

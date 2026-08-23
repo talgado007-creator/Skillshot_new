@@ -1,0 +1,18 @@
+{
+  "appId": "com.ondrejluka.skillshot",
+  "appName": "Skillshot",
+  "webDir": "www",
+  "android": { "backgroundColor": "#07090F" },
+  "ios": { "backgroundColor": "#07090F", "contentInset": "never" },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 900,
+      "launchAutoHide": true,
+      "backgroundColor": "#07090F",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    }
+  }
+}
