@@ -92,13 +92,15 @@ jobs:
         if: env.ASC_KEY_ID != ''
         working-directory: ios/App
         run: |
-          # The project ships Capacitor's default CODE_SIGN_IDENTITY of "iPhone Developer"
-          # in Release, so archiving asks Apple for a DEVELOPMENT profile — and those need
-          # registered devices, which a CI account has none of ("your team has no devices").
-          # Overriding to Apple Distribution here makes -allowProvisioningUpdates mint an
-          # App Store profile instead, which needs no devices. Overridden on the command
-          # line rather than in the .xcodeproj so opening the project locally still signs
-          # for development.
+          # Signing here is automatic on purpose. Capacitor's project hardcoded
+          # CODE_SIGN_IDENTITY = "iPhone Developer" in the Release config, which made
+          # archiving ask Apple for a DEVELOPMENT profile; those embed device UDIDs and
+          # Apple refuses to mint one for a team with no devices registered, which a CI-only
+          # account never has. That setting is now deleted from the Release config so
+          # -allowProvisioningUpdates can choose a distribution profile for the archive.
+          # Do not re-add it, and do not pass CODE_SIGN_IDENTITY here either: with
+          # CODE_SIGN_STYLE=Automatic, Xcode rejects a manually specified identity outright
+          # ("conflicting provisioning settings"). Debug still signs for development.
           # CURRENT_PROJECT_VERSION is the build number. App Store Connect refuses a
           # second upload with a build number it has already seen, so tie it to the
           # run number — it never repeats and always climbs.
@@ -112,7 +114,6 @@ jobs:
                      -authenticationKeyID "$ASC_KEY_ID" \
                      -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
                      CODE_SIGN_STYLE=Automatic \
-                     CODE_SIGN_IDENTITY="Apple Distribution" \
                      DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
                      CURRENT_PROJECT_VERSION=${{ github.run_number }} \
                      clean archive
