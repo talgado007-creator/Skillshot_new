@@ -213,19 +213,38 @@ useful error.
 4. ~~Ad frequency~~ — **done.** Now every **third** death (`S.deaths % 3`), fired when
    the player leaves the death screen. Was every other, which risked a reviewer hitting
    several ads in two minutes.
-5. ~~iOS signing~~ — **unsigned path verified; signed path still unrun.** `ios.yml` now signs and can upload to
-   TestFlight. No certificate or provisioning profile to manage: `-allowProvisioningUpdates`
-   plus an App Store Connect API key lets Xcode mint both on the runner, which is the only
-   sane route with no Mac. Four secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`
-   (the whole .p8), `IOS_TEAM_ID`. With none set it still builds unsigned. The build number
-   is `github.run_number`, because App Store Connect rejects a build number it has already
-   seen. **The unsigned path is now verified**: run #1 on 23 Aug 2026 compiled Release on
-   `macos-26`, and `xcodebuild -list` found the committed scheme — so the no-CocoaPods/SPM
-   assumption and the missing-scheme trap are both confirmed rather than assumed. The
-   *signed* path is still unrun; it needs a paid Apple Developer account. One bug was
-   found and fixed along the way: the TestFlight step passed `--api-key` / `--api-issuer`,
-   but `altool(1)` spells them `--apiKey` / `--apiIssuer`, so the first upload would have
-   died on an unknown option.
+5. ~~iOS signing~~ — **done and verified end to end.** A signed `.ipa` was produced on
+   24 Aug 2026. `ios.yml` uses **manual signing, and must keep doing so.** Automatic
+   signing is impossible on this account and three runs proved it: `xcodebuild archive`
+   with `CODE_SIGN_STYLE=Automatic` always requests a *development* profile, development
+   profiles embed device UDIDs, and Apple refuses to issue one to a team with no
+   registered devices — "Your team has no devices from which to generate a provisioning
+   profile". Deleting Capacitor's hardcoded `CODE_SIGN_IDENTITY = "iPhone Developer"`
+   from the Release config did not help (that line is gone anyway, and Debug keeps its
+   copy), and forcing `CODE_SIGN_IDENTITY=Apple Distribution` is rejected outright with
+   "conflicting provisioning settings" because automatic signing owns that decision.
+   Do not try to "simplify" this back to `-allowProvisioningUpdates`.
+
+   The certificate and profile were minted once, from a CSR generated with OpenSSL on
+   Windows — no Mac needed — and live in `Downloads/skillshot-keystore/ios/` alongside
+   the private key. Secrets: `IOS_P12_BASE64`, `IOS_P12_PASSWORD`, `IOS_PROFILE_BASE64`,
+   `IOS_TEAM_ID` (`9N75USU2RM`). The build imports them into a throwaway keychain and
+   deletes it in an `always()` step. `set-key-partition-list` is load-bearing: without it
+   codesign raises a GUI keychain prompt nothing can answer and the job hangs to timeout.
+
+   **The distribution certificate expires 24 Aug 2027.** After that every signed build
+   fails with "no identity found"; regenerate from the same CSR flow and replace
+   `IOS_P12_BASE64`. The provisioning profile expires with it.
+
+   TestFlight upload is a separate `upload: true` input and needs `ASC_KEY_ID`,
+   `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`. One bug was fixed there unseen: the step passed
+   `--api-key` / `--api-issuer`, but `altool(1)` spells them `--apiKey` / `--apiIssuer`.
+   Build number is `github.run_number`, because App Store Connect permanently reserves
+   every build number it has accepted.
+
+   Every `xcodebuild` call builds its arguments in a bash array rather than using
+   backslash line continuations, so a reflowed line cannot silently truncate a command.
+
 6. ~~Rewarded-ad resolve timing~~ — **done.** The plugin's own Android source confirms the
    show call resolves from the earned-reward listener, while the ad is still up. `Ads.watch()`
    waits for the dismiss event instead. Still worth eyeballing once on a real device: watch a
