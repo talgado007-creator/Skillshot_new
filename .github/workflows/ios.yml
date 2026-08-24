@@ -147,14 +147,15 @@ jobs:
         run: |
           IPA=$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)
           echo "Uploading $IPA"
-          # Older Xcode spelled these --apiKey / --apiIssuer. Xcode 26's altool
-          # uses the hyphenated form; if it ever errors on an unknown option,
-          # that is the flag to flip.
+          # altool(1) spells these --apiKey / --apiIssuer, camelCase, not hyphenated.
+          # It locates the key itself by looking for AuthKey_<id>.p8 in ./private_keys,
+          # ~/private_keys, ~/.private_keys or ~/.appstoreconnect/private_keys - the
+          # step above writes it to two of those, so no path is passed here.
           xcrun altool --upload-app \
                        --type ios \
                        --file "$IPA" \
-                       --api-key "$ASC_KEY_ID" \
-                       --api-issuer "$ASC_ISSUER_ID"
+                       --apiKey "$ASC_KEY_ID" \
+                       --apiIssuer "$ASC_ISSUER_ID"
 
       - name: Clean up the key
         if: always()

@@ -213,13 +213,19 @@ useful error.
 4. ~~Ad frequency~~ — **done.** Now every **third** death (`S.deaths % 3`), fired when
    the player leaves the death screen. Was every other, which risked a reviewer hitting
    several ads in two minutes.
-5. ~~iOS signing~~ — **written, never run.** `ios.yml` now signs and can upload to
+5. ~~iOS signing~~ — **unsigned path verified; signed path still unrun.** `ios.yml` now signs and can upload to
    TestFlight. No certificate or provisioning profile to manage: `-allowProvisioningUpdates`
    plus an App Store Connect API key lets Xcode mint both on the runner, which is the only
    sane route with no Mac. Four secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY`
    (the whole .p8), `IOS_TEAM_ID`. With none set it still builds unsigned. The build number
    is `github.run_number`, because App Store Connect rejects a build number it has already
-   seen. **Unverified end to end** — it needs a paid Apple Developer account to run at all.
+   seen. **The unsigned path is now verified**: run #1 on 23 Aug 2026 compiled Release on
+   `macos-26`, and `xcodebuild -list` found the committed scheme — so the no-CocoaPods/SPM
+   assumption and the missing-scheme trap are both confirmed rather than assumed. The
+   *signed* path is still unrun; it needs a paid Apple Developer account. One bug was
+   found and fixed along the way: the TestFlight step passed `--api-key` / `--api-issuer`,
+   but `altool(1)` spells them `--apiKey` / `--apiIssuer`, so the first upload would have
+   died on an unknown option.
 6. ~~Rewarded-ad resolve timing~~ — **done.** The plugin's own Android source confirms the
    show call resolves from the earned-reward listener, while the ad is still up. `Ads.watch()`
    waits for the dismiss event instead. Still worth eyeballing once on a real device: watch a
