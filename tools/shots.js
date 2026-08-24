@@ -1,9 +1,10 @@
-// Capture Play/App Store screenshots from the real game.
+// Capture store screenshots from the real game.
 //
-//   cd tools && node shots.js
+//   cd tools && node shots.js          -> Play, 1440x2560 (9:16)
+//   cd tools && node shots.js ios      -> App Store 6.5", 1284x2778
 //
-// Writes 1440x2560 PNGs into ../assets/store/. That is Play's 9:16 phone size;
-// Apple's 6.9" 1320x2868 is a different ratio and needs its own pass.
+// Apple's ratio is taller than Play's 16:9, so each store needs its own capture
+// rather than a resize; scaling one to the other letterboxes or crops the HUD.
 //
 // Like harness.js this builds a throwaway copy rather than touching www/index.html.
 // Two edits: the usual window.__t hook, and the death check neutered — a real run
@@ -27,9 +28,14 @@ window.__t = { S, P, startRun, die, toMenu, goMenu };
 requestAnimationFrame(frame);
 })();`;
 
-// 360x640 CSS at 4x gives exactly 1440x2560.
-const VIEW = { width: 360, height: 640 };
-const SCALE = 4;
+// CSS viewport x deviceScaleFactor must land exactly on each store's pixel size.
+const TARGETS = {
+  play: { view: { width: 360, height: 640 }, scale: 4, prefix: 'screen',     px: '1440x2560' },
+  ios:  { view: { width: 428, height: 926 }, scale: 3, prefix: 'ios-screen', px: '1284x2778' }
+};
+const key = (process.argv[2] || 'play').toLowerCase();
+const T = TARGETS[key];
+if (!T) { console.error(`unknown target "${key}" — use play or ios`); process.exit(1); }
 
 // A believable board, so the death screen is not an empty-state screenshot.
 const BOARD = [
@@ -76,16 +82,17 @@ async function clockPast(page, secs, capMs = 120000) {
 }
 
 async function shoot(page, name) {
-  const file = path.join(OUT, name);
+  const file = path.join(OUT, `${T.prefix}-${name}.png`);
   await page.screenshot({ path: file });
-  console.log('  wrote', path.relative(process.cwd(), file));
+  console.log('  wrote', path.basename(file));
 }
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
   const url = build();
+  console.log(`target ${key} -> ${T.px}`);
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: VIEW, deviceScaleFactor: SCALE });
+  const ctx = await browser.newContext({ viewport: T.view, deviceScaleFactor: T.scale });
 
   await ctx.addInitScript(board => {
     localStorage.setItem('skillshot.scores.v1', JSON.stringify(board));
@@ -97,21 +104,21 @@ async function shoot(page, name) {
 
   await page.goto(url);
   await page.waitForTimeout(1200);          // fonts + first paint
-  await shoot(page, 'screen-1-menu.png');
+  await shoot(page, '1-menu');
 
   await page.click('#play');
   await clockPast(page, 13);                 // skillshots + ground AoE + beams
-  await shoot(page, 'screen-2-early.png');
+  await shoot(page, '2-early');
 
   await clockPast(page, 46);                 // all five hazard types, spawn gaps tightening
-  await shoot(page, 'screen-3-late.png');
+  await shoot(page, '3-late');
 
   await clockPast(page, 85);                 // deep run: the arena at its busiest
-  await shoot(page, 'screen-4-deep.png');
+  await shoot(page, '4-deep');
 
   await page.evaluate(() => { __t.S.count = 0; __t.P.inv = 0; __t.die(); });
   await page.waitForTimeout(900);            // let the panel settle
-  await shoot(page, 'screen-5-board.png');
+  await shoot(page, '5-board');
 
   await browser.close();
   console.log(errors.length ? '\npage errors:\n' + errors.join('\n') : '\nno page errors');
