@@ -59,6 +59,12 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<!-- Skillshot implements no encryption of its own. It makes HTTPS calls for ads,
+	     and HTTPS provided by the OS is exempt. Declaring this here means App Store
+	     Connect stops holding every build at "Missing Compliance" waiting for the
+	     export question to be answered by hand. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>GADApplicationIdentifier</key>
 	<!-- AdMob App ID (not an ad unit ID). From AdMob > Apps > Skillshot (iOS). -->
 	<string>ca-app-pub-4625958262504617~6474091731</string>
