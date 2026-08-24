@@ -1,38 +1,44 @@
 # Builds the iOS app on GitHub's macOS runners — this is how you ship to the
 # App Store without owning a Mac.
 #
-# macos-26 ships Xcode 26.4.1 by default, which satisfies Apple's requirement that
-# App Store uploads be built with Xcode 26+ against the iOS 26 SDK.
+# macos-26 ships Xcode 26.x, which satisfies Apple's requirement that App Store
+# uploads be built with Xcode 26+ against the iOS 26 SDK.
 #
-# COST NOTE: macOS runner minutes bill at 10x the Linux rate on private repos.
-# A build here is a few minutes, so it is cheap, but it is not free like Android.
+# COST NOTE: macOS runner minutes bill at 10x the Linux rate on PRIVATE repos.
+# While this repo is public they are free.
 #
-# ── SIGNING ────────────────────────────────────────────────────────────────────
-# With no secrets set this builds UNSIGNED, which only proves the project compiles.
-# Add these four repository secrets and it produces a signed .ipa instead:
+# ── SIGNING IS MANUAL, ON PURPOSE ──────────────────────────────────────────────
+# Automatic signing cannot work on a Mac-less account, and three runs proved it.
+# `xcodebuild archive` with CODE_SIGN_STYLE=Automatic always asks Apple for a
+# DEVELOPMENT profile; development profiles embed device UDIDs; and Apple refuses
+# to issue one to a team with no registered devices — which a CI-only account
+# never has ("Your team has no devices from which to generate a provisioning
+# profile"). Deleting Capacitor's hardcoded "iPhone Developer" identity from the
+# Release config did not help, and forcing CODE_SIGN_IDENTITY=Apple Distribution
+# is rejected outright ("conflicting provisioning settings") because automatic
+# signing owns that decision. Manual signing sidesteps all of it: a human mints
+# the certificate and profile once, they live as secrets, and the build never
+# needs to talk to Apple's provisioning service at all.
 #
-#   ASC_KEY_ID       App Store Connect > Users and Access > Integrations > App Store
-#                    Connect API. Create a key with the "App Manager" role. This is
-#                    the 10-character Key ID.
-#   ASC_ISSUER_ID    The Issuer ID shown at the top of that same page (a UUID).
-#   ASC_PRIVATE_KEY  The whole contents of the AuthKey_XXXXXXXXXX.p8 file you
-#                    download when the key is created, BEGIN/END lines included.
-#                    Apple lets you download it exactly once.
-#   IOS_TEAM_ID      Developer account > Membership > Team ID (10 characters).
+# Secrets required for a signed build:
+#   IOS_P12_BASE64      base64 of the Apple Distribution certificate + private key
+#   IOS_P12_PASSWORD    password protecting that .p12
+#   IOS_PROFILE_BASE64  base64 of the App Store .mobileprovision
+#   IOS_TEAM_ID         10-character Team ID
+# Only needed to actually send the build to TestFlight:
+#   ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY
 #
-# There is deliberately no certificate or provisioning profile to manage. Passing
-# -allowProvisioningUpdates with the API key lets Xcode create and fetch both on
-# the runner, which is the only sane route when you have no Mac to run Keychain
-# Access on.
+# With IOS_P12_BASE64 unset this still builds UNSIGNED, which proves it compiles.
 #
-# Set the "upload" input to true to send the build to TestFlight as well.
+# The distribution certificate expires one year after issue. When it does, builds
+# fail with "no identity found" — regenerate it and replace IOS_P12_BASE64.
 name: iOS
 
 on:
-  workflow_dispatch:        # on demand only, so you don't burn macOS minutes on every push
+  workflow_dispatch:
     inputs:
       upload:
-        description: 'Also upload to TestFlight (needs the signing secrets)'
+        description: 'Also upload to TestFlight (needs the ASC_* secrets)'
         type: boolean
         default: false
 
@@ -40,10 +46,13 @@ jobs:
   build:
     runs-on: macos-26
     env:
+      IOS_P12_BASE64: ${{ secrets.IOS_P12_BASE64 }}
+      IOS_P12_PASSWORD: ${{ secrets.IOS_P12_PASSWORD }}
+      IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
       ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
-      IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
     steps:
       - uses: actions/checkout@v6
 
@@ -59,93 +68,117 @@ jobs:
 
       # No CocoaPods here. Capacitor 8 wires its plugins through Swift Package
       # Manager (ios/App/CapApp-SPM), so there is no Podfile and no .xcworkspace —
-      # every xcodebuild call below uses -project App.xcodeproj on purpose.
+      # every xcodebuild call uses -project App.xcodeproj on purpose.
       - name: Show what Xcode sees
         working-directory: ios/App
         run: xcodebuild -project App.xcodeproj -list
 
-      # ── unsigned path: no secrets set ───────────────────────────────────────
+      # ── unsigned path: no certificate secret set ────────────────────────────
       - name: Build (unsigned)
-        if: env.ASC_KEY_ID == ''
+        if: env.IOS_P12_BASE64 == ''
         working-directory: ios/App
         run: |
-          echo "No ASC_KEY_ID secret — building UNSIGNED. This cannot be uploaded."
-          xcodebuild -project App.xcodeproj \
-                     -scheme App \
-                     -configuration Release \
-                     -destination 'generic/platform=iOS' \
-                     CODE_SIGNING_ALLOWED=NO \
-                     clean build
+          echo "No IOS_P12_BASE64 secret - building UNSIGNED. This cannot be uploaded."
+          ARGS=(-project App.xcodeproj -scheme App -configuration Release)
+          ARGS+=(-destination 'generic/platform=iOS')
+          ARGS+=(CODE_SIGNING_ALLOWED=NO)
+          xcodebuild "${ARGS[@]}" clean build
 
       # ── signed path ─────────────────────────────────────────────────────────
-      - name: Write the App Store Connect API key
-        if: env.ASC_KEY_ID != ''
+      # Every xcodebuild call below builds its arguments in a bash array rather
+      # than using backslash line continuations. Same result, but nothing breaks
+      # if a line gets reflowed.
+      - name: Import certificate and profile
+        if: env.IOS_P12_BASE64 != ''
         run: |
-          # altool looks for AuthKey_<id>.p8 in ~/.appstoreconnect/private_keys
-          # and ~/private_keys. xcodebuild wants an explicit path. Put it in both.
-          mkdir -p ~/.appstoreconnect/private_keys ~/private_keys
-          printf '%s\n' "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
-          cp ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 ~/private_keys/
-          chmod 600 ~/.appstoreconnect/private_keys/*.p8 ~/private_keys/*.p8
+          set -euo pipefail
+          KEYCHAIN="$RUNNER_TEMP/skillshot.keychain-db"
+          KPW=$(uuidgen)
+          echo "KEYCHAIN=$KEYCHAIN" >> "$GITHUB_ENV"
+          echo "::add-mask::$KPW"
+
+          security create-keychain -p "$KPW" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KPW" "$KEYCHAIN"
+          # codesign only searches keychains that are on the user search list
+          ORIG=$(security list-keychains -d user | tr -d '"' | tr -d ' ')
+          security list-keychains -d user -s "$KEYCHAIN" $ORIG
+          security default-keychain -s "$KEYCHAIN"
+
+          printf '%s' "$IOS_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$IOS_P12_PASSWORD" -A -T /usr/bin/codesign -T /usr/bin/security
+          # Without set-key-partition-list, codesign raises a GUI keychain prompt
+          # that nobody can answer and the job hangs until it times out.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KPW" "$KEYCHAIN" > /dev/null
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+          echo "signing identities available:"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+          PROFILES="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES"
+          printf '%s' "$IOS_PROFILE_BASE64" | base64 --decode > "$RUNNER_TEMP/pp.mobileprovision"
+          UUID=$(security cms -D -i "$RUNNER_TEMP/pp.mobileprovision" | plutil -extract UUID raw -)
+          NAME=$(security cms -D -i "$RUNNER_TEMP/pp.mobileprovision" | plutil -extract Name raw -)
+          APPID=$(security cms -D -i "$RUNNER_TEMP/pp.mobileprovision" | plutil -extract Entitlements.application-identifier raw -)
+          cp "$RUNNER_TEMP/pp.mobileprovision" "$PROFILES/$UUID.mobileprovision"
+          echo "PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+          echo "installed profile: $NAME  uuid=$UUID  app-id=$APPID"
 
       - name: Archive (signed)
-        if: env.ASC_KEY_ID != ''
+        if: env.IOS_P12_BASE64 != ''
         working-directory: ios/App
         run: |
-          # Signing here is automatic on purpose. Capacitor's project hardcoded
-          # CODE_SIGN_IDENTITY = "iPhone Developer" in the Release config, which made
-          # archiving ask Apple for a DEVELOPMENT profile; those embed device UDIDs and
-          # Apple refuses to mint one for a team with no devices registered, which a CI-only
-          # account never has. That setting is now deleted from the Release config so
-          # -allowProvisioningUpdates can choose a distribution profile for the archive.
-          # Do not re-add it, and do not pass CODE_SIGN_IDENTITY here either: with
-          # CODE_SIGN_STYLE=Automatic, Xcode rejects a manually specified identity outright
-          # ("conflicting provisioning settings"). Debug still signs for development.
+          set -euo pipefail
           # CURRENT_PROJECT_VERSION is the build number. App Store Connect refuses a
           # second upload with a build number it has already seen, so tie it to the
           # run number — it never repeats and always climbs.
-          xcodebuild -project App.xcodeproj \
-                     -scheme App \
-                     -configuration Release \
-                     -destination 'generic/platform=iOS' \
-                     -archivePath "$RUNNER_TEMP/App.xcarchive" \
-                     -allowProvisioningUpdates \
-                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-                     -authenticationKeyID "$ASC_KEY_ID" \
-                     -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-                     CODE_SIGN_STYLE=Automatic \
-                     DEVELOPMENT_TEAM="$IOS_TEAM_ID" \
-                     CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-                     clean archive
+          ARGS=(-project App.xcodeproj -scheme App -configuration Release)
+          ARGS+=(-destination 'generic/platform=iOS')
+          ARGS+=(-archivePath "$RUNNER_TEMP/App.xcarchive")
+          ARGS+=(CODE_SIGN_STYLE=Manual)
+          ARGS+=(CODE_SIGN_IDENTITY="Apple Distribution")
+          ARGS+=(PROVISIONING_PROFILE_SPECIFIER="$PROFILE_UUID")
+          ARGS+=(DEVELOPMENT_TEAM="$IOS_TEAM_ID")
+          ARGS+=(OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN")
+          ARGS+=(CURRENT_PROJECT_VERSION=${{ github.run_number }})
+          xcodebuild "${ARGS[@]}" clean archive
 
       - name: Export .ipa
-        if: env.ASC_KEY_ID != ''
+        if: env.IOS_P12_BASE64 != ''
         working-directory: ios/App
         run: |
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<PLIST
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>teamID</key><string>${IOS_TEAM_ID}</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>uploadSymbols</key><true/>
-            <key>destination</key><string>export</string>
-          </dict>
-          </plist>
-          PLIST
-          xcodebuild -exportArchive \
-                     -archivePath "$RUNNER_TEMP/App.xcarchive" \
-                     -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-                     -exportPath "$RUNNER_TEMP/export" \
-                     -allowProvisioningUpdates \
-                     -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8" \
-                     -authenticationKeyID "$ASC_KEY_ID" \
-                     -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          set -euo pipefail
+          PLIST_PATH="$RUNNER_TEMP/ExportOptions.plist"
+          {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">'
+            echo '<plist version="1.0">'
+            echo '<dict>'
+            echo '  <key>method</key><string>app-store-connect</string>'
+            echo "  <key>teamID</key><string>$IOS_TEAM_ID</string>"
+            echo '  <key>signingStyle</key><string>manual</string>'
+            echo '  <key>signingCertificate</key><string>Apple Distribution</string>'
+            echo '  <key>provisioningProfiles</key>'
+            echo '  <dict>'
+            echo "    <key>skillshot.dodge.app</key><string>$PROFILE_UUID</string>"
+            echo '  </dict>'
+            echo '  <key>uploadSymbols</key><true/>'
+            echo '  <key>destination</key><string>export</string>'
+            echo '</dict>'
+            echo '</plist>'
+          } > "$PLIST_PATH"
+          plutil -lint "$PLIST_PATH"
+
+          ARGS=(-exportArchive)
+          ARGS+=(-archivePath "$RUNNER_TEMP/App.xcarchive")
+          ARGS+=(-exportOptionsPlist "$PLIST_PATH")
+          ARGS+=(-exportPath "$RUNNER_TEMP/export")
+          xcodebuild "${ARGS[@]}"
+          ls -la "$RUNNER_TEMP/export"
 
       - name: Upload build artifact
-        if: env.ASC_KEY_ID != ''
+        if: env.IOS_P12_BASE64 != ''
         uses: actions/upload-artifact@v7
         with:
           name: skillshot-ios
@@ -153,20 +186,27 @@ jobs:
           if-no-files-found: error
 
       - name: Upload to TestFlight
-        if: env.ASC_KEY_ID != '' && inputs.upload
+        if: env.IOS_P12_BASE64 != '' && env.ASC_KEY_ID != '' && inputs.upload
         run: |
+          set -euo pipefail
+          # altool looks for AuthKey_<id>.p8 in ~/.appstoreconnect/private_keys and
+          # ~/private_keys, so the key goes in both and no path is passed.
+          mkdir -p ~/.appstoreconnect/private_keys ~/private_keys
+          printf '%s' "$ASC_PRIVATE_KEY" > ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          cp ~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8 ~/private_keys/
+          chmod 600 ~/.appstoreconnect/private_keys/*.p8 ~/private_keys/*.p8
           IPA=$(ls "$RUNNER_TEMP"/export/*.ipa | head -1)
           echo "Uploading $IPA"
           # altool(1) spells these --apiKey / --apiIssuer, camelCase, not hyphenated.
-          # It locates the key itself by looking for AuthKey_<id>.p8 in ./private_keys,
-          # ~/private_keys, ~/.private_keys or ~/.appstoreconnect/private_keys - the
-          # step above writes it to two of those, so no path is passed here.
-          xcrun altool --upload-app \
-                       --type ios \
-                       --file "$IPA" \
-                       --apiKey "$ASC_KEY_ID" \
-                       --apiIssuer "$ASC_ISSUER_ID"
+          xcrun altool --upload-app --type ios --file "$IPA" --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
 
-      - name: Clean up the key
+      - name: Clean up secrets from the runner
         if: always()
-        run: rm -rf ~/.appstoreconnect/private_keys ~/private_keys
+        run: |
+          rm -rf ~/.appstoreconnect/private_keys ~/private_keys
+          if [ -n "${KEYCHAIN:-}" ] && [ -f "$KEYCHAIN" ]; then
+            security delete-keychain "$KEYCHAIN" || true
+          fi
+          if [ -n "${PROFILE_UUID:-}" ]; then
+            rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision" || true
+          fi
