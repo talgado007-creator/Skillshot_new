@@ -249,6 +249,13 @@ useful error.
    show call resolves from the earned-reward listener, while the ad is still up. `Ads.watch()`
    waits for the dismiss event instead. Still worth eyeballing once on a real device: watch a
    rewarded ad to the end and confirm the 3-2-1 starts only after it closes.
+**iOS ships iPhone-only** (`TARGETED_DEVICE_FAMILY = "1"`). It was `"1,2"`, and Apple
+rejected the first TestFlight upload for it: error 90474, "you need to include all of the
+Portrait, PortraitUpsideDown, LandscapeLeft, LandscapeRight orientations to support iPad
+multitasking". Adding those orientations would be the wrong fix — the game is portrait-locked
+by design, and iPad multitasking is exactly the resize case that open item 7 below says is
+broken. It still runs on iPad in iPhone compatibility mode.
+
 7. **Resize mid-run.** `resize()` rebuilds the canvas but hazards keep their old
    coordinates. Portrait is locked on both platforms, so this only reaches Android
    multi-window and unfolding foldables. Left alone deliberately.
