@@ -82,24 +82,25 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 #pausebtn:active{transform:scale(.94)}
 
 /* ── Ability buttons ── */
-#abils{
-  position:absolute;right:max(16px,env(safe-area-inset-right));
-  bottom:max(26px,calc(env(safe-area-inset-bottom) + 18px));
-  display:flex;gap:10px;pointer-events:auto;
-}
+/* Each button is placed individually from the saved layout (see LAYOUT below), so
+   this is only a full-screen stage that does not eat input itself. Every size is
+   derived from the --s custom property, which means the glyph, the cooldown number
+   and the label all scale together when a button is resized. */
+#abils{ position:absolute;inset:0;pointer-events:none; }
 .ab{
-  position:relative;width:64px;height:64px;border-radius:50%;
+  position:absolute;width:var(--s,64px);height:var(--s,64px);border-radius:50%;
   border:1.5px solid var(--line);background:rgba(15,24,40,.82);
-  display:grid;place-items:center;isolation:isolate;
-  transition:transform .08s,border-color .15s;
+  display:grid;place-items:center;isolation:isolate;pointer-events:auto;
+  transform:translate(-50%,-50%);
+  transition:border-color .15s;
 }
-.ab:active{transform:scale(.93)}
-.ab .k{font-family:'Oxanium',sans-serif;font-weight:800;font-size:19px;letter-spacing:.02em;color:var(--bone)}
-.ab .n{position:absolute;bottom:-15px;left:0;right:0;text-align:center;
-  font-family:'Oxanium',sans-serif;font-weight:600;font-size:9px;letter-spacing:.14em;color:var(--mist)}
+.ab:active{transform:translate(-50%,-50%) scale(.93)}
+.ab .k{font-family:'Oxanium',sans-serif;font-weight:800;font-size:calc(var(--s,64px)*.30);letter-spacing:.02em;color:var(--bone)}
+.ab .n{position:absolute;bottom:calc(var(--s,64px)*-.23);left:0;right:0;text-align:center;
+  font-family:'Oxanium',sans-serif;font-weight:600;font-size:calc(var(--s,64px)*.14);letter-spacing:.14em;color:var(--mist)}
 .ab .sweep{position:absolute;inset:-1.5px;border-radius:50%;overflow:hidden;pointer-events:none}
 .ab .cdnum{position:absolute;inset:0;display:grid;place-items:center;
-  font-family:'Oxanium',sans-serif;font-weight:800;font-size:17px;color:var(--mist);
+  font-family:'Oxanium',sans-serif;font-weight:800;font-size:calc(var(--s,64px)*.27);color:var(--mist);
   font-variant-numeric:tabular-nums}
 .ab.cooling .k{opacity:0}
 .ab.ready{border-color:currentColor;box-shadow:0 0 18px -4px currentColor,inset 0 0 14px -8px currentColor}
@@ -108,6 +109,26 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .ab[data-a="dash"]{color:var(--acid)}
 .ab[data-a="ghost"]{color:var(--hex)}
 .ab.hide{display:none}
+
+/* ── customise controls ──
+   The buttons live in #hud, the dimmed backdrop is a .screen, and the settings
+   panel has to sit above both. z-index creates a stacking context, so the panel
+   is a sibling of the backdrop rather than a child of it — nested, it could never
+   paint above #hud however high its z-index went. */
+#ctrl{z-index:30}
+#hud.editmode{opacity:1;z-index:40}
+#hud.editmode .ab{cursor:grab;touch-action:none}
+.ab.picked{border-color:var(--flare);box-shadow:0 0 0 2px var(--flare),0 0 26px -6px var(--flare)}
+.ab.picked .k{color:var(--flare)}
+#ctrlpanel{
+  position:absolute;z-index:50;display:none;
+  left:16px;right:16px;top:max(18px,calc(env(safe-area-inset-top) + 12px));
+  background:rgba(15,24,40,.96);border:1px solid var(--line);border-radius:14px;
+  padding:14px 16px;flex-direction:column;gap:10px;pointer-events:auto;
+}
+#ctrlpanel.on{display:flex}
+#ctrlpanel .chint{margin:0;font-size:12px;line-height:1.5;color:var(--mist)}
+#ctrlsize{width:100%;accent-color:var(--flare)}
 
 /* ── Overlays ── */
 .screen{
@@ -316,6 +337,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
           <div class="card" data-a="ghost"><div class="ic">G</div><div class="nm">GHOST</div><div class="cd">11s</div></div>
         </div>
         <div class="hint">Flash blinks instantly. Dash propels you forward. Ghost makes you faster for 2.5s. Run with nothing armed and your time earns a <b>★ PURIST</b> mark.</div>
+        <button id="ctrlopen" class="privlink">Customise controls</button>
         <button id="privacyopts" class="privlink" hidden>Privacy &amp; ad settings</button>
       </div>
 
@@ -325,6 +347,22 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
         <div class="phead"><span class="lab">Best times</span><span class="lab" id="runcount"></span></div>
         <div class="lb" id="board"></div>
       </div>
+    </div>
+  </div>
+
+  <!-- ── customise controls ──
+       The panel sits at the TOP on purpose. Buttons default to the bottom of the
+       screen because that is where a thumb reaches, so a panel down there covers the
+       very things you came to drag: DONE landed exactly on top of FLASH. -->
+  <div class="screen" id="ctrl"></div>
+  <div id="ctrlpanel">
+    <div class="phead"><span class="lab">Customise controls</span><span class="lab" id="ctrlwho">FLASH</span></div>
+    <p class="chint">Drag a button to move it. Tap one to select, then resize it below.
+      All three appear whatever your loadout, so each is placed once.</p>
+    <input type="range" id="ctrlsize" min="44" max="104" step="1" value="64" aria-label="Button size">
+    <div class="row">
+      <button class="btn sec" id="ctrlreset">RESET</button>
+      <button class="btn pri" id="ctrldone">DONE</button>
     </div>
   </div>
 
@@ -423,7 +461,15 @@ cv.addEventListener('pointermove', e => {
   const max = STICK_MAX * U;
   let dx = e.clientX - stick.ox, dy = e.clientY - stick.oy;
   const m = Math.hypot(dx, dy);
-  if (m > max) { const k = max / m; dx *= k; dy *= k; }
+  if (m > max) {
+    const k = max / m; dx *= k; dy *= k;
+    // Trail the origin behind the thumb. It used to stay where the finger first
+    // landed, so everything dragged past the ring was dead travel that had to be
+    // retraced before the stick could point the other way — commit hard to one
+    // direction and a sharp reversal took as long as the drag that preceded it.
+    // Keeping the origin exactly one ring-radius behind makes reversals instant.
+    stick.ox = e.clientX - dx; stick.oy = e.clientY - dy;
+  }
   stick.cx = stick.ox + dx; stick.cy = stick.oy + dy;
   stick.dx = dx / max; stick.dy = dy / max;
 });
@@ -1405,6 +1451,124 @@ document.querySelectorAll('.ab').forEach(b => {
   abBtns[a] = { el:b, sweep:b.querySelector('.sweep'), num:b.querySelector('.cdnum') };
   b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); cast(a); });
 });
+
+/* ══ control layout ═════════════════════════════════════════════════
+   Positions are fractions of the viewport, never pixels: a layout arranged on a
+   6.7" phone would otherwise put buttons off the bottom of a small one. Size is in
+   px and drives --s, so the glyph and label scale with the button.
+   cast() already returns unless S.mode === 'play', so the existing tap handler is
+   inert while customising and needs no special-casing here. */
+const LAYOUT_KEY = 'skillshot.layout.v1';
+const AB_MIN = 44, AB_MAX = 104;
+// Defaults reproduce the old fixed bottom-right cluster for the default loadout.
+const LAYOUT_DEF = { ghost:{x:.50,y:.93,s:64}, flash:{x:.69,y:.93,s:64}, dash:{x:.88,y:.93,s:64} };
+let LAYOUT = {};
+function resetLayout(){ LAYOUT = JSON.parse(JSON.stringify(LAYOUT_DEF)); }
+resetLayout();
+
+function clampBtn(l){
+  const w = innerWidth || 390, h = innerHeight || 844, hs = l.s / 2 + 6;
+  l.x = Math.min(Math.max(l.x, hs / w), 1 - hs / w);
+  l.y = Math.min(Math.max(l.y, hs / h), 1 - hs / h);
+  return l;
+}
+function applyLayout(){
+  for (const a in abBtns){
+    const l = clampBtn(LAYOUT[a] || (LAYOUT[a] = { ...LAYOUT_DEF[a] }));
+    const el = abBtns[a].el;
+    el.style.setProperty('--s', l.s + 'px');
+    el.style.left = (l.x * 100) + '%';
+    el.style.top  = (l.y * 100) + '%';
+  }
+}
+async function loadLayout(){
+  const r = await Store.get(LAYOUT_KEY);
+  if (r.ok && r.v) {
+    try {
+      const v = JSON.parse(r.v);
+      for (const a in LAYOUT_DEF){
+        const o = v[a];
+        // a corrupt or hand-edited store must not strand a button off screen
+        if (o && isFinite(o.x) && isFinite(o.y) && isFinite(o.s))
+          LAYOUT[a] = { x:+o.x, y:+o.y, s:Math.min(AB_MAX, Math.max(AB_MIN, +o.s)) };
+      }
+    } catch(_){}
+  }
+  applyLayout();
+}
+function saveLayout(){ Store.set(LAYOUT_KEY, JSON.stringify(LAYOUT)); }
+// applyLayout() is safe here — it only touches the DOM. The stored layout is read
+// later, next to loadScores(), because Store is declared further down the file and
+// a const is in its temporal dead zone until then: calling loadLayout() from here
+// threw "Cannot access 'Store' before initialization", which silently left every
+// saved layout unread while the defaults still rendered fine.
+applyLayout();
+addEventListener('resize', applyLayout);
+
+/* ── customise mode ── */
+const elHud = document.getElementById('hud');
+const elCtrlPanel = document.getElementById('ctrlpanel');
+const elCtrlSize = document.getElementById('ctrlsize');
+const elCtrlWho = document.getElementById('ctrlwho');
+let editSel = null, editDrag = null;
+
+function editPick(a){
+  editSel = a;
+  for (const k in abBtns) abBtns[k].el.classList.toggle('picked', k === a);
+  elCtrlSize.value = LAYOUT[a].s;
+  elCtrlWho.textContent = a.toUpperCase();
+}
+function openCtrl(){
+  S.mode = 'ctrl';
+  show('menu', false); show('ctrl', true);
+  elHud.classList.add('on', 'editmode');
+  elCtrlPanel.classList.add('on');
+  // show every button while editing, whatever the loadout, so all three get placed
+  for (const k in abBtns) abBtns[k].el.classList.remove('hide');
+  editPick('flash');
+}
+function closeCtrl(){
+  saveLayout();
+  editSel = null; editDrag = null;
+  for (const k in abBtns) abBtns[k].el.classList.remove('picked');
+  elCtrlPanel.classList.remove('on');
+  elHud.classList.remove('on', 'editmode');
+  syncAbilButtons();
+  show('ctrl', false); show('menu', true);
+  S.mode = 'menu';
+}
+document.getElementById('ctrlopen').addEventListener('click', openCtrl);
+document.getElementById('ctrldone').addEventListener('click', closeCtrl);
+document.getElementById('ctrlreset').addEventListener('click', () => {
+  resetLayout(); applyLayout(); if (editSel) editPick(editSel);
+});
+elCtrlSize.addEventListener('input', () => {
+  if (!editSel) return;
+  LAYOUT[editSel].s = Math.min(AB_MAX, Math.max(AB_MIN, +elCtrlSize.value));
+  applyLayout();
+});
+for (const a in abBtns){
+  abBtns[a].el.addEventListener('pointerdown', e => {
+    if (S.mode !== 'ctrl') return;
+    e.preventDefault(); e.stopPropagation();
+    editPick(a);
+    editDrag = { id:e.pointerId, a };
+  });
+}
+// The drag is tracked on the window rather than on the button. Pointer capture on
+// the button itself is not dependable here: as soon as the pointer leaves the
+// circle the moves are delivered to whatever sits underneath, and the button stops
+// following after a few pixels. The window always sees the whole gesture.
+addEventListener('pointermove', e => {
+  if (!editDrag || editDrag.id !== e.pointerId) return;
+  e.preventDefault();
+  LAYOUT[editDrag.a].x = e.clientX / (innerWidth || 390);
+  LAYOUT[editDrag.a].y = e.clientY / (innerHeight || 844);
+  applyLayout();
+}, { passive:false });
+const endEditDrag = e => { if (editDrag && editDrag.id === e.pointerId) editDrag = null; };
+addEventListener('pointerup', endEditDrag);
+addEventListener('pointercancel', endEditDrag);
 let lastCount = -1;
 function syncCount(){
   const box = document.getElementById('countdown'), n = document.getElementById('cnum');
@@ -1582,6 +1746,7 @@ resize();
 render();
 syncAbilButtons();
 loadScores();
+loadLayout();
 Ads.init();
 requestAnimationFrame(frame);
 })();

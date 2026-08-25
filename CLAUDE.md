@@ -110,6 +110,30 @@ Abilities, toggled before each run: Flash (blink, 9s), Dash (0.16s at 4.4x, 5s),
 (1.62x for 2.5s, 11s). Running with nothing armed earns a "purist" mark — this is the
 fairness mechanism instead of a score multiplier.
 
+**The joystick origin trails the thumb.** Drag past the ring and the origin is pulled
+along so it is never more than one radius behind. It used to stay where the finger
+first landed, so everything dragged beyond the ring was dead travel that had to be
+retraced before the stick could point the other way: commit hard to one direction and
+a sharp reversal took as long as the drag that preceded it. Reported from play as "if
+I go too much to the right and then I need a sharp left it takes too long".
+
+**Ability buttons are player-positioned and player-sized.** Each of the three is placed
+from a saved layout (`skillshot.layout.v1`) rather than a fixed bottom-right row, via a
+"Customise controls" screen on the menu. Positions are fractions of the viewport, never
+pixels, so a layout arranged on a large phone still lands on screen on a small one, and
+`clampBtn()` drags anything out of range back into view on load. Sizes drive a `--s`
+custom property, so the glyph, cooldown number and label all scale with the button.
+`inThumbZone()` needed no change: it already measured real button rectangles rather
+than a fixed corner, so the joystick dead zone follows the buttons for free.
+
+Three traps here, all caught by `tools/layout.js` and none visible by reading the code:
+`loadLayout()` must run *after* `Store` is declared (a `const` in its temporal dead zone
+threw, leaving every saved layout unread while the defaults still rendered perfectly);
+the drag is tracked on `window`, because pointer capture on the button stops delivering
+moves once the pointer leaves the circle; and the customise panel sits at the **top** of
+the screen because at the bottom its DONE button covered FLASH exactly, making the
+buttons impossible to grab at their default positions.
+
 ### Test harnesses — `tools/`
 Playwright, driving the real `www/index.html` headless at phone size. `cd tools &&
 npm install && npx playwright install chromium`, then `node race.js` / `node bonus.js`.

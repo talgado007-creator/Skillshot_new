@@ -54,3 +54,12 @@ interstitial. Use it after every retry.
 Also: `page.evaluate(() => __t.toMenu())` **awaits the returned promise**, and `toMenu()`
 does not resolve until the ad closes — which your script is what's supposed to close.
 That deadlocks. Wrap it: `page.evaluate(() => { __t.toMenu(); })`.
+
+## layout.js
+
+Covers the customisable control layout: drag, resize, glyph scaling, per-button
+isolation, persistence and off-screen clamping. It reloads the page deliberately —
+the first version of the feature applied and dragged correctly but never read the
+saved layout back, and only a reload exposes that.
+
+    node layout.js
