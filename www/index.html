@@ -859,8 +859,15 @@ const Ads = {
     if (!AdMob) return;
     try {
       // iOS needs App Tracking Transparency before personalised ads can serve.
+      // Never let it block initialisation, though: if the prompt cannot be shown the
+      // plugin call can sit unresolved, and consent(), initialize() and therefore
+      // every ad in the app would queue behind it forever — the app looks fine and
+      // simply never shows an advert. Same reasoning as the dismiss guard in watch().
       if (this.platform() === 'ios' && AdMob.requestTrackingAuthorization) {
-        await AdMob.requestTrackingAuthorization();
+        await Promise.race([
+          Promise.resolve(AdMob.requestTrackingAuthorization()).catch(() => {}),
+          new Promise(r => setTimeout(r, 6000))
+        ]);
       }
       await this.consent();
       await AdMob.initialize({ initializeForTesting: AD_TESTING });

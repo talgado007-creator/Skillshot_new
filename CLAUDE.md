@@ -176,7 +176,10 @@ script, during the 900ms splash, so on a real device the prompt never appeared a
 which meant personalised ads could never serve on iOS, and App Review could not see the
 prompt they explicitly ask to be shown in a demo recording. It now waits for the first
 pointerdown or keydown, with a 2.5s fallback; a real gesture guarantees the app is
-active. Do not move it back inline.
+active. Do not move it back inline. The call is also raced against a 6s timeout,
+because an ATT promise that never settles would leave `consent()` and `initialize()`
+queued behind it forever — the app looks perfectly healthy and simply never shows an
+advert. That was the likely cause of ads not appearing in TestFlight at all.
 
 ### The intro screen is not decoration
 A rewarded interstitial does not ask the player to opt in the way a rewarded video does, so
