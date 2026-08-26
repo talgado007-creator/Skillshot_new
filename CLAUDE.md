@@ -336,6 +336,15 @@ The shipping file has no `__t` hook.
 
 ## Store state
 
+**The closed test clock started 26 Aug 2026.** Google requires a personal developer
+account to hold 12+ testers opted in *continuously* for 14 days before it will even
+accept an application for production access, so the earliest that application can be
+made is **09 Sep 2026**. If the count drops below 12 at any point the run is
+broken and the fourteen days start again, which is the single most expensive thing that
+can go wrong on the Android path — everything else here is fixable in minutes. Pushing
+new builds to the track during the wait does not reset it.
+
+
 Play Console account exists. Not yet uploaded. The blocking constraint is Google's rule
 that a personal developer account must run a **closed test with 12+ testers opted in for 14
 consecutive days** before applying for production. Nothing else on the Android path takes
