@@ -1,0 +1,60 @@
+1. SCREEN RECORDING
+Attached to this reply.
+
+2. DEVICES AND OS TESTED
+iPhone [MODEL], iOS [iOS VERSION] - installed via TestFlight and played through
+multiple full sessions including the advert flows.
+
+3. WHAT THE APP DOES AND WHO IT IS FOR
+Skillshot is a single-player arcade dodge game. The player moves one circle with a
+floating on-screen joystick and survives as long as possible while five kinds of
+hazard fly in from the screen edges: fast projectiles, ground area attacks, fixed
+beams, homing orbs and returning boomerangs. There are no levels and no waves; the
+spawn rate climbs continuously with elapsed time, and the score is simply how long
+the player lasted.
+
+It is for casual and arcade players aged 13 and over. It is rated 4+: there is no
+violence, no realistic imagery and no communication between users - every visual is
+an abstract neon shape drawn in code. A run lasts from seconds to a couple of
+minutes, and best times are kept on the device so the player competes with
+themselves.
+
+4. HOW TO ACCESS EVERY FEATURE
+No account, login, password or sample file is required. Nothing is gated or
+purchasable.
+- Launch the app. iOS shows the App Tracking Transparency prompt on first launch;
+  either answer is accepted and gameplay is identical afterwards.
+- The menu has a Loadout panel with three optional abilities (Flash, Dash, Ghost).
+  Tap the cards to arm or disarm them. Running with none armed earns a purist mark.
+- Tap PLAY. A 3-2-1 countdown runs, then the game begins.
+- Drag anywhere to move; a joystick appears wherever the finger lands.
+- Tap the round F, D and G buttons to use an armed ability. Each shows its cooldown.
+- Touching any hazard ends the run.
+- On the death screen: RETRY starts another run, MENU returns to the menu, and
+  REVIVE - WATCH AD offers a rewarded advert to continue the same run.
+- Customise controls, on the menu, lets the ability buttons be dragged anywhere and
+  resized.
+- Best times appear on the menu and the death screen, are stored only on the device,
+  and are deleted when the app is uninstalled.
+
+5. EXTERNAL SERVICES AND PLATFORMS
+- Google AdMob (Google Mobile Ads SDK) for advertising: interstitial, rewarded video
+  and rewarded interstitial.
+- Google User Messaging Platform for advertising consent in the EEA and UK.
+- Apple App Tracking Transparency for the system tracking prompt.
+- Capacitor (Ionic) as the native wrapper; the game itself is HTML5 and Canvas.
+There are no servers operated by us, and no authentication service, payment
+processor, analytics platform or AI service. No data reaches any service we control.
+
+6. REGIONAL DIFFERENCES
+Gameplay, features and content are identical everywhere. The only difference is
+legal: users in the EEA and UK see Google's consent form before personalised adverts
+are served, and a Privacy and ad settings button on the menu lets them change that
+choice at any time. Elsewhere the form is not shown.
+
+7. REGULATED INDUSTRY OR PROTECTED MATERIAL
+The app is not part of any regulated industry. Third-party material is limited to
+the Oxanium and Barlow typefaces, used under the SIL Open Font License, and
+advertising creative supplied by Google under our AdMob publisher agreement. All
+game artwork is drawn procedurally in code; there are no imported image, audio or
+video assets.

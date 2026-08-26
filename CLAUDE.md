@@ -169,6 +169,15 @@ they always read their own time first. `S.lastAdDeath` guards re-firing.
   player's. Only an actual dismissal is refused, and even then the button stays live.
 - No banner ads — they steal arena space in a full-screen dodge game.
 
+**App Tracking Transparency must not be requested during launch.** iOS silently drops
+an ATT request made before the app is frontmost: no prompt, no error, and the status
+stays "not determined" forever. `Ads.init()` originally ran inline at the end of the
+script, during the 900ms splash, so on a real device the prompt never appeared at all —
+which meant personalised ads could never serve on iOS, and App Review could not see the
+prompt they explicitly ask to be shown in a demo recording. It now waits for the first
+pointerdown or keydown, with a 2.5s fallback; a real gesture guarantees the app is
+active. Do not move it back inline.
+
 ### The intro screen is not decoration
 A rewarded interstitial does not ask the player to opt in the way a rewarded video does, so
 Google requires the app itself to show an intro screen carrying the reward and a way out

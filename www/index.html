@@ -1747,7 +1747,24 @@ render();
 syncAbilButtons();
 loadScores();
 loadLayout();
-Ads.init();
+
+// iOS silently drops an App Tracking Transparency request made before the app is
+// frontmost: no prompt appears, no error is raised, and the status simply stays
+// "not determined". Ads.init() used to run right here, during the 900ms splash,
+// so on a real device the prompt never showed at all — personalised ads could
+// never serve, and App Review could not see the prompt they ask to be shown.
+// A real user gesture guarantees the app is active; the timer is a fallback for
+// anyone who stares at the menu without touching it.
+let adsStarted = false;
+function startAds(){
+  if (adsStarted) return;
+  adsStarted = true;
+  Ads.init();
+}
+addEventListener('pointerdown', startAds, { once:true });
+addEventListener('keydown', startAds, { once:true });
+setTimeout(startAds, 2500);
+
 requestAnimationFrame(frame);
 })();
 </script>

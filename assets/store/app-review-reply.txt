@@ -1,0 +1,116 @@
+Reply to App Review — Guideline 2.1, Information Needed
+=======================================================
+Paste items 2–7 into "Reply to App Review". Item 1 is the screen recording,
+which has to be made on your iPhone. Also paste items 3–7 into the Notes field
+of App Review Information so future submissions never trigger this again.
+
+Replace [MODEL] and [iOS VERSION] before sending.
+
+
+1. SCREEN RECORDING
+-------------------
+Attached separately. (See the recording checklist at the bottom of this file.)
+
+
+2. DEVICES AND OPERATING SYSTEMS TESTED
+---------------------------------------
+iPhone [MODEL], iOS [iOS VERSION] — installed via TestFlight and played through
+multiple full sessions, including the advert flows.
+
+
+3. WHAT THE APP DOES AND WHO IT IS FOR
+--------------------------------------
+Skillshot is a single-player arcade dodge game. The player moves one circle with
+a floating on-screen joystick and survives for as long as possible while five
+kinds of hazard fly in from the screen edges: fast projectiles, ground area
+attacks, fixed beams, homing orbs and returning boomerangs.
+
+There are no levels and no waves. The spawn rate climbs continuously with elapsed
+time, so every run is a single unbroken escalation and the score is simply how
+long the player lasted.
+
+Target audience is casual and arcade players aged 13 and over. The app is rated
+4+ as it contains no violence, no realistic imagery and no text communication —
+all visuals are abstract neon shapes drawn in code.
+
+The value it provides is a short-session reflex challenge: a run lasts seconds to
+a couple of minutes, and personal best times are kept on the device so the player
+competes against themselves.
+
+
+4. HOW TO ACCESS EVERY FEATURE
+------------------------------
+No account, login, password, subscription or sample file is required. Nothing in
+the app is gated, purchasable or hidden behind any credential.
+
+- Launch the app. On first launch iOS shows the App Tracking Transparency prompt.
+  Either answer is accepted and gameplay is identical afterwards.
+- The main menu shows a "Loadout" panel with three optional abilities: Flash,
+  Dash and Ghost. Tap the cards to arm or disarm them. Running with none armed
+  marks the score with a "purist" badge.
+- Tap PLAY. A 3-2-1 countdown runs, then the game begins.
+- Drag anywhere on the screen to move. A joystick appears wherever the finger
+  lands and the circle follows it.
+- Tap the round ability buttons (F, D, G) to use an armed ability. Each has its
+  own cooldown, shown as a number inside the button.
+- Touching any hazard ends the run.
+- On the death screen: RETRY starts another run, MENU returns to the main menu,
+  and "REVIVE — WATCH AD" offers a rewarded advert to continue the same run.
+- "Customise controls" on the main menu opens a screen where the ability buttons
+  can be dragged to any position and resized.
+- Best times appear on the main menu and the death screen. They are stored only
+  on the device and are deleted when the app is uninstalled.
+
+
+5. EXTERNAL SERVICES, TOOLS AND PLATFORMS
+-----------------------------------------
+- Google AdMob (Google Mobile Ads SDK) — advertising. Interstitial, rewarded
+  video and rewarded interstitial formats.
+- Google User Messaging Platform (UMP) — collects advertising consent from users
+  in the EEA and the UK, as Google requires before serving personalised ads.
+- Apple App Tracking Transparency — the system tracking permission prompt.
+- Capacitor (Ionic) — the native wrapper. The game itself is HTML5 and Canvas.
+
+There are no servers operated by us. There is no authentication service, no
+payment processor, no analytics platform of ours and no AI service. No data is
+transmitted to any service we control.
+
+
+6. REGIONAL DIFFERENCES
+-----------------------
+Gameplay, features and content are identical in every region.
+
+The only difference is a legal one: users in the EEA and the UK are shown
+Google's UMP consent form before personalised advertising is served, and a
+"Privacy & ad settings" button is present on the main menu so they can change
+that choice at any time. Outside those regions the form is not shown. Nothing
+about the game itself changes.
+
+
+7. REGULATED INDUSTRY OR PROTECTED MATERIAL
+-------------------------------------------
+The app is not part of any regulated industry.
+
+Third-party material is limited to two typefaces, Oxanium and Barlow, both used
+under the SIL Open Font License, and advertising creative supplied by Google
+AdMob under our AdMob publisher agreement. Every piece of game artwork is drawn
+procedurally in code; there are no imported images, audio or video assets.
+
+
+=======================================================
+SCREEN RECORDING CHECKLIST
+=======================================================
+Record on the iPhone: swipe into Control Centre and tap the record button.
+Apple requires it to start from launching the app.
+
+  1. Start recording on the Home screen, then tap the Skillshot icon.
+  2. Let the App Tracking Transparency prompt appear and answer it — Apple
+     specifically asks to see this prompt.
+  3. Show the main menu. Tap an ability card to arm and disarm it.
+  4. Open "Customise controls", drag a button, resize it, tap DONE.
+  5. Tap PLAY. Play a full run, using at least one ability, until you die.
+  6. On the death screen show the buttons, including "REVIVE — WATCH AD".
+  7. Play again until an advert appears, and let it play and close.
+  8. Return to the menu so the best-times list is visible.
+
+Two minutes is plenty. Upload it when replying to App Review.
