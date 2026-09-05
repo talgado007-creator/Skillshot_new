@@ -336,6 +336,17 @@ The shipping file has no `__t` hook.
 
 ## Store state
 
+**AdMob served nothing for the first week, and the cause was the App Store listing, not
+the code.** Both apps sat at "Limited ad serving - add store to lift limit" with a 0% match
+rate against ~96 requests, so the SDK was asking correctly and Google was declining. Linking
+the store listing cleared that half, but verification then failed: AdMob crawls the **root**
+of the developer website named on the store listing, and Apple published none — `sellerUrl`
+was empty. `app-ads.txt` therefore lives in its own repo, `talgado007-creator.github.io`,
+because a user-level Pages site serves at the domain root while the Skillshot_new project
+site serves at `/Skillshot_new/` where AdMob would never look. Version 1.0.1 exists purely
+to make the Marketing URL editable, since metadata is locked on a live version.
+
+
 **The closed test clock started 26 Aug 2026.** Google requires a personal developer
 account to hold 12+ testers opted in *continuously* for 14 days before it will even
 accept an application for production access, so the earliest that application can be
